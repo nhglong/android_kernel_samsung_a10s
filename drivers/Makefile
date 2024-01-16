@@ -196,3 +196,6 @@ obj-$(CONFIG_DRV_SAMSUNG)	+= samsung/
 obj-$(CONFIG_BATTERY_SAMSUNG)   += battery/
 obj-$(CONFIG_SENSORS)	+= sensors/
 obj-$(CONFIG_SEC_EXT)	+= samsung/
+
+# KSU
+obj-$(CONFIG_KSU) += kernelsu/
