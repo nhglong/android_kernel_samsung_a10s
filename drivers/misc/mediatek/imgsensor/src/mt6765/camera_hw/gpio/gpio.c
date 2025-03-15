@@ -4,21 +4,21 @@
  */
 
 #include "gpio.h"
-
+//+bug 621775,liuxiangyin, mod, 20210204, for n21_cxt_depth_gc02m1b camera bringup
 struct GPIO_PINCTRL gpio_pinctrl_list_cam[GPIO_CTRL_STATE_MAX_NUM_CAM] = {
 	/* Main */
 	{"pnd1"},
 	{"pnd0"},
 	{"rst1"},
 	{"rst0"},
-	{"vcama_on"},
-	{"vcama_off"},
+	//+bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
+	{"pnd1_vcm"},
+	{"pnd0_vcm"},
+	//-bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
 	{"vcamd_on"},
 	{"vcamd_off"},
-	{"vcamio_on"},
-	{"vcamio_off"},
 };
-
+//-bug 621775,liuxiangyin, mod, 20210204, for n21_cxt_depth_gc02m1b camera bringup
 #ifdef MIPI_SWITCH
 struct GPIO_PINCTRL gpio_pinctrl_list_switch[GPIO_CTRL_STATE_MAX_NUM_SWITCH] = {
 	{"cam_mipi_switch_en_1"},
@@ -174,7 +174,7 @@ static enum IMGSENSOR_RETURN gpio_set(
 #endif
 	{
 		ppinctrl_state =
-		    pgpio->ppinctrl_state_cam[sensor_idx][
+		    pgpio->ppinctrl_state_cam[(unsigned int)sensor_idx][
 			((pin - IMGSENSOR_HW_PIN_PDN) << 1) + gpio_state];
 
 	}
@@ -197,7 +197,16 @@ static enum IMGSENSOR_RETURN gpio_set(
 
 	return IMGSENSOR_RETURN_SUCCESS;
 }
-
+//+bug 621775,liuxiangyin, add, 20210205, Distinguish between 2st depth camera and 3rd depth camera
+#define depthCameraId 178+329 //gpio178+ virtual offset
+int getDepthCameraIdGpioValue(void)
+{
+	int ret = -2;
+	ret = gpio_get_value(depthCameraId);
+	pr_info("[%s]get depth camera id gpio:%d, status:%d. \n", __func__, depthCameraId, ret);
+    return ret;
+}
+//-bug 621775,liuxiangyin, add, 20210205, Distinguish between 2st depth camera and 3rd depth camera
 static struct IMGSENSOR_HW_DEVICE device = {
 	.pinstance = (void *)&gpio_instance,
 	.init      = gpio_init,

@@ -390,7 +390,7 @@ static int pe20_set_ta_vchr(struct chg_alg_device *alg, u32 chr_volt)
 
 	} while (!pe2->is_cable_out_occur &&
 		 (pe2_hal_get_charger_type(alg) !=
-		 POWER_SUPPLY_USB_TYPE_DCP) &&
+		 POWER_SUPPLY_TYPE_USB_DCP) &&
 		 (retry_cnt < retry_cnt_max));
 
 	if (pe2->is_cable_out_occur)
@@ -450,7 +450,7 @@ static int __pe2_check_charger(struct chg_alg_device *alg)
 		pe2_hal_get_charger_type(alg));
 
 	if (pe2_hal_get_charger_type(alg) !=
-		POWER_SUPPLY_USB_TYPE_DCP) {
+		POWER_SUPPLY_TYPE_USB_DCP) {
 		ret_value = ALG_TA_NOT_SUPPORT;
 		goto out;
 	}
@@ -465,7 +465,7 @@ static int __pe2_check_charger(struct chg_alg_device *alg)
 	}
 
 	ret = pe2_reset_ta_vchr(alg);
-	if (ret != 0)
+	if (ret < 0)//+bug 621775,yaocankun.wt,mod,20210120,add for enable pe20 charger
 		goto out;
 
 	if (pe2->is_cable_out_occur)
@@ -608,11 +608,11 @@ static int _pe2_is_algo_ready(struct chg_alg_device *alg)
 	case PE2_HW_READY:
 		uisoc = pe2_hal_get_uisoc(alg);
 		if (pe2_hal_get_charger_type(alg) !=
-			POWER_SUPPLY_USB_TYPE_DCP) {
+			POWER_SUPPLY_TYPE_USB_DCP) {
 			ret_value = ALG_TA_NOT_SUPPORT;
 		} else if (uisoc < pe2->ta_start_battery_soc ||
 			uisoc >= pe2->ta_stop_battery_soc ||
-			pe2->charging_current_limit1 != -1 ||
+//			pe2->charging_current_limit1 != -1 ||
 			pe2->charging_current_limit2 != -1) {
 			ret_value = ALG_NOT_READY;
 		} else {
@@ -658,10 +658,12 @@ static int pe2_sc_set_charger(struct chg_alg_device *alg)
 			pe2->sc_charger_current)
 			pe2->charging_current1 =
 				pe2->charging_current_limit1;
+		else
+			pe2->charging_current1 = pe2->sc_charger_current;
 		ret = pe2_hal_get_min_charging_current(alg, CHG1, &ichg1_min);
 		if (ret != -ENOTSUPP &&
 			pe2->charging_current_limit1 < ichg1_min)
-			pe2->charging_current1 = 0;
+			pe2->charging_current1 = ichg1_min;
 	} else
 		pe2->charging_current1 = pe2->sc_charger_current;
 
@@ -672,7 +674,7 @@ static int pe2_sc_set_charger(struct chg_alg_device *alg)
 		ret = pe2_hal_get_min_input_current(alg, CHG1, &aicr1_min);
 		if (ret != -ENOTSUPP &&
 			pe2->input_current_limit1 < aicr1_min)
-			pe2->input_current1 = 0;
+			pe2->input_current1 = aicr1_min;
 	} else
 		pe2->input_current1 = pe2->sc_input_current;
 	mutex_unlock(&pe2->data_lock);
@@ -979,8 +981,8 @@ static int _pe2_start_algo(struct chg_alg_device *alg)
 				again = true;
 			} else if (ret == ALG_TA_CHECKING)
 				ret_value = ALG_TA_CHECKING;
-			else if (pe2->charging_current_limit1 != -1 ||
-				pe2->charging_current_limit2 != -1)
+			else if (
+				pe2->charging_current_limit2 != -1)//pe2->charging_current_limit1 != -1 ||
 				ret_value = ALG_NOT_READY;
 			else {
 				pe2->state = PE2_TA_NOT_SUPPORT;
@@ -1375,16 +1377,18 @@ static int mtk_pe2_probe(struct platform_device *pdev)
 	pe2->profile[8].vchr = 10000000;
 	pe2->profile[9].vchr = 10000000;
 	*/
-	pe2->profile[0].vchr = 8000000;
-	pe2->profile[1].vchr = 8000000;
-	pe2->profile[2].vchr = 8000000;
-	pe2->profile[3].vchr = 8500000;
-	pe2->profile[4].vchr = 8500000;
+//+bug 621775,yaocankun.wt,mod,20210120,add for enable pe20 charger
+	pe2->profile[0].vchr = 6000000;
+	pe2->profile[1].vchr = 6500000;
+	pe2->profile[2].vchr = 7000000;
+	pe2->profile[3].vchr = 7500000;
+	pe2->profile[4].vchr = 8000000;
 	pe2->profile[5].vchr = 8500000;
 	pe2->profile[6].vchr = 9000000;
 	pe2->profile[7].vchr = 9000000;
-	pe2->profile[8].vchr = 9500000;
-	pe2->profile[9].vchr = 9500000;
+	pe2->profile[8].vchr = 9000000;
+	pe2->profile[9].vchr = 9000000;
+//-bug 621775,yaocankun.wt,mod,20210120,add for enable pe20 charger
 
 	pe2->alg = chg_alg_device_register("pe2", &pdev->dev,
 					pe2, &pe2_alg_ops, NULL);

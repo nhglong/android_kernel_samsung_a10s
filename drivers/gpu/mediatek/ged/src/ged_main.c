@@ -41,6 +41,10 @@
 #include "ged_ge.h"
 #include "ged_gpu_tuner.h"
 
+#ifdef GED_SKI_SUPPORT
+#include "ged_ski.h"
+#endif
+
 /**
  * ===============================================
  * SECTION : Local functions declaration
@@ -173,8 +177,8 @@ static long ged_dispatch(struct file *pFile,
 
 	/* We make sure the both size are GE 0 integer.
 	 */
-	if (psBridgePackageKM->i32InBufferSize >= 0
-		&& psBridgePackageKM->i32OutBufferSize >= 0) {
+	if (psBridgePackageKM->i32InBufferSize > 0
+		&& psBridgePackageKM->i32OutBufferSize > 0) {
 
 		if (psBridgePackageKM->i32InBufferSize > 0) {
 			int32_t inputBufferSize =
@@ -283,11 +287,11 @@ static long ged_dispatch(struct file *pFile,
 			break;
 		case GED_BRIDGE_COMMAND_GE_GET:
 			VALIDATE_ARG(GE_GET);
-			ret = ged_bridge_ge_get(pvIn, pvOut);
+			ret = ged_bridge_ge_get(pvIn, pvOut, psBridgePackageKM->i32OutBufferSize);
 			break;
 		case GED_BRIDGE_COMMAND_GE_SET:
 			VALIDATE_ARG(GE_SET);
-			ret = ged_bridge_ge_set(pvIn, pvOut);
+			ret = ged_bridge_ge_set(pvIn, pvOut, psBridgePackageKM->i32InBufferSize);
 			break;
 		case GED_BRIDGE_COMMAND_GE_INFO:
 			VALIDATE_ARG(GE_INFO);
@@ -444,6 +448,10 @@ static void ged_exit(void)
 	ghLogBuf_GPU = 0;
 #endif /* GED_BUFFER_LOG_DISABLE */
 
+#ifdef GED_SKI_SUPPORT
+	ged_ski_exit();
+#endif
+
 	ged_gpu_tuner_exit();
 
 	ged_kpi_system_exit();
@@ -539,6 +547,14 @@ static int ged_init(void)
 		GED_LOGE("Failed to init GPU Tuner!\n");
 		goto ERROR;
 	}
+
+#ifdef GED_SKI_SUPPORT
+	err = ged_ski_init();
+	if (unlikely(err != GED_OK)) {
+		GED_LOGE("Failed to init SKI!\n");
+		goto ERROR;
+	}
+#endif
 
 #ifndef GED_BUFFER_LOG_DISABLE
 	ghLogBuf_GPU = ged_log_buf_alloc(512, 128 * 512,

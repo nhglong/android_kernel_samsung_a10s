@@ -11,6 +11,38 @@
 #include <linux/compat.h>
 #endif
 
+//+bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
+struct stCAM_CAL_DATAINFO_STRUCT{
+	u32 sensorID; // Sensor ID
+	u32 deviceID; // MAIN = 0x01, SUB  = 0x02, MAIN_2 = 0x04
+	u32 dataLength; //Data len
+	u32 sensorVendorid; // Module ID | Pos ID | Vcm ID | Len ID
+	u8  vendorByte[4]; // Module ID offset, Pos ID offset, Vcm ID offset,  Len ID offset
+	u8  *dataBuffer; //It's need malloc dataLength cache
+};
+
+typedef enum{
+	MODULE_ITEM = 0,
+	AWB_ITEM,
+	SEGMENT_ITEM,
+	AF_ITEM,
+	LSC_ITEM,
+	PDAF_ITEM,
+	DUALCAM_ITEM,
+	TOTAL_ITEM,
+	MAX_ITEM,
+}stCAM_CAL_CHECKSUM_ITEM;
+
+struct stCAM_CAL_CHECKSUM_STRUCT{
+	stCAM_CAL_CHECKSUM_ITEM item;
+	u32 flagAdrees;
+	u32 startAdress;
+	u32 endAdress;
+	u32 checksumAdress;
+	u8  validFlag;
+};
+//+bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
+
 struct stCAM_CAL_INFO_STRUCT {
 	u32 u4Offset;
 	u32 u4Length;

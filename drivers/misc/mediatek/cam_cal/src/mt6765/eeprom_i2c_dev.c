@@ -6,10 +6,12 @@
 
 static enum EEPROM_I2C_DEV_IDX gi2c_dev_sel[IMGSENSOR_SENSOR_IDX_MAX_NUM] = {
 	I2C_DEV_IDX_1, /* main */
+	//+bug 612420,huangguoyong.wt,add,2020/12/25,add for n6 camera bring up
 	I2C_DEV_IDX_2, /* sub */
-	I2C_DEV_IDX_3, /* main2 */
-	I2C_DEV_IDX_1, /* sub2 */
-	I2C_DEV_IDX_3, /* main3 */
+	I2C_DEV_IDX_2, /* main2 */
+	I2C_DEV_IDX_2, /* sub2 */
+	//-bug 612420,huangguoyong.wt,add,2020/12/25,add for n6 camera bring up
+	I2C_DEV_IDX_1, /* main3 */
 };
 
 enum EEPROM_I2C_DEV_IDX get_i2c_dev_sel(enum IMGSENSOR_SENSOR_IDX idx)

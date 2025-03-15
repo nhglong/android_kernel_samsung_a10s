@@ -61,6 +61,11 @@ struct charger_ops {
 	/* enable/disable charger */
 	int (*enable)(struct charger_device *dev, bool en);
 	int (*is_enabled)(struct charger_device *dev, bool *en);
+//+bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+	int (*hz_mode)(struct charger_device *chg_dev, bool en);
+#endif
+//-bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
 
 	/* enable/disable chip */
 	int (*enable_chip)(struct charger_device *dev, bool en);
@@ -253,6 +258,12 @@ extern int charger_dev_reset_eoc_state(
 	struct charger_device *charger_dev);
 extern int charger_dev_safety_check(
 	struct charger_device *charger_dev, u32 polling_ieoc);
+//+bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+extern int charger_dev_hz_mode(
+	struct charger_device *chg_dev, bool en);
+#endif
+//-bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
 
 /* PE+/PE+2.0 */
 extern int charger_dev_send_ta_current_pattern(

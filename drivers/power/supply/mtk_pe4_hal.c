@@ -194,7 +194,7 @@ int pe4_hal_enable_termination(struct chg_alg_device *alg,
 int pe4_hal_get_uisoc(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop;
-	struct power_supply *bat_psy = NULL;
+	static struct power_supply *bat_psy = NULL;
 	int ret;
 	struct mtk_pe40 *pe4;
 
@@ -202,8 +202,11 @@ int pe4_hal_get_uisoc(struct chg_alg_device *alg)
 		return -EINVAL;
 
 	pe4 = dev_get_drvdata(&alg->dev);
-	bat_psy = devm_power_supply_get_by_phandle(&pe4->pdev->dev,
-						       "gauge");
+	if (bat_psy == NULL) {
+		bat_psy = devm_power_supply_get_by_phandle(&pe4->pdev->dev,
+							       "gauge");
+		pr_debug("%s devm_power_supply_get_by_phandle:%d\n", __func__, sizeof(bat_psy));
+	}
 	if (IS_ERR(bat_psy)) {
 		pr_notice("%s Couldn't get bat_psy\n", __func__);
 		ret = 50;
@@ -247,7 +250,7 @@ int pe4_hal_is_pd_adapter_ready(struct chg_alg_device *alg)
 int pe4_hal_get_battery_temperature(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop;
-	struct power_supply *bat_psy = NULL;
+	static struct power_supply *bat_psy = NULL;
 	int ret;
 	struct mtk_pe40 *pe4;
 
@@ -255,8 +258,11 @@ int pe4_hal_get_battery_temperature(struct chg_alg_device *alg)
 		return -EINVAL;
 
 	pe4 = dev_get_drvdata(&alg->dev);
-	bat_psy = devm_power_supply_get_by_phandle(&pe4->pdev->dev,
+	if (bat_psy == NULL) {
+		bat_psy = devm_power_supply_get_by_phandle(&pe4->pdev->dev,
 						       "gauge");
+		chr_debug("%s devm_power_supply_get_by_phandle:%d\n", __func__, sizeof(bat_psy);
+	}
 
 	if (bat_psy == NULL || IS_ERR(bat_psy)) {
 		chr_err("%s Couldn't get bat_psy\n", __func__);
@@ -562,7 +568,7 @@ int pe4_hal_get_vbus(struct chg_alg_device *alg)
 int pe4_hal_get_vbat(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop;
-	struct power_supply *bat_psy = NULL;
+	static struct power_supply *bat_psy = NULL;
 	int ret;
 	struct mtk_pe40 *pe4;
 
@@ -571,8 +577,11 @@ int pe4_hal_get_vbat(struct chg_alg_device *alg)
 
 	pe4 = dev_get_drvdata(&alg->dev);
 
-	bat_psy = devm_power_supply_get_by_phandle(&pe4->pdev->dev,
-						       "gauge");
+	if (bat_psy == NULL) {
+		bat_psy = devm_power_supply_get_by_phandle(&pe4->pdev->dev,
+							       "gauge");
+		pr_debug("%s devm_power_supply_get_by_phandle:%d\n", __func__, sizeof(bat_psy));
+	}
 	if (IS_ERR(bat_psy)) {
 		pr_notice("%s Couldn't get bat_psy\n", __func__);
 		ret = 3999;
@@ -618,7 +627,7 @@ int pe4_hal_dump_registers(struct chg_alg_device *alg)
 int pe4_hal_get_ibat(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop;
-	struct power_supply *bat_psy = NULL;
+	static struct power_supply *bat_psy = NULL;
 	int ret;
 	struct mtk_pe40 *pe4;
 
@@ -626,8 +635,11 @@ int pe4_hal_get_ibat(struct chg_alg_device *alg)
 		return -EINVAL;
 
 	pe4 = dev_get_drvdata(&alg->dev);
-	bat_psy = devm_power_supply_get_by_phandle(&pe4->pdev->dev,
-						       "gauge");
+	if (bat_psy == NULL) {
+		bat_psy = devm_power_supply_get_by_phandle(&pe4->pdev->dev,
+							       "gauge");
+		pr_debug("%s devm_power_supply_get_by_phandle:%d\n", __func__, sizeof(bat_psy));
+	}
 	if (IS_ERR(bat_psy)) {
 		pr_notice("%s Couldn't get bat_psy\n", __func__);
 		ret = 0;

@@ -514,6 +514,19 @@ int charger_dev_get_zcv(struct charger_device *chg_dev, u32 *uV)
 }
 EXPORT_SYMBOL(charger_dev_get_zcv);
 
+//+bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+int charger_dev_hz_mode(struct charger_device *chg_dev, bool en)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL && chg_dev->ops->hz_mode)
+		return chg_dev->ops->hz_mode(chg_dev, en);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_hz_mode);
+#endif
+//-bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
+
 int charger_dev_run_aicl(struct charger_device *chg_dev, u32 *uA)
 {
 	if (chg_dev != NULL && chg_dev->ops != NULL && chg_dev->ops->run_aicl)

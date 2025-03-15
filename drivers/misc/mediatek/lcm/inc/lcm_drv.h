@@ -724,6 +724,28 @@ struct LCM_DSI_PARAMS {
 #endif
 };
 
+//+Bug 621774, chensibo.wt, ADD, 20210120, lcd bring up
+/* ------------------------------------------------------------------------- */
+struct LCM_ROUND_CORNER {
+	unsigned int w;
+	unsigned int h;
+	unsigned int tp_size;
+	unsigned int bt_size;
+	void *lt_addr;
+	void *rt_addr;
+	void *lb_addr;
+	void *rb_addr;
+};
+//-Bug 621774, chensibo.wt, ADD, 20210120, lcd bring up
+
+//+bug621774, liuguohua.wt, add, 20200120, lcd bring up
+struct LCM_BACKLIGHT_CUSTOM{
+	unsigned int max_brightness;
+	unsigned int min_brightness;
+	unsigned int max_bl_lvl;
+	unsigned int min_bl_lvl;
+};
+//-bug621774, liuguohua.wt, add, 20200120, lcd bring up
 /* ------------------------------------------------------------------------- */
 struct LCM_PARAMS {
 	enum LCM_TYPE type;
@@ -760,6 +782,9 @@ struct LCM_PARAMS {
 	unsigned int corner_pattern_width;
 	unsigned int corner_pattern_height;
 	unsigned int corner_pattern_height_bot;
+	struct LCM_ROUND_CORNER round_corner_params;//+Bug 621774, chensibo.wt, ADD,20210121, set backlight
+	unsigned int backlight_cust_count;
+	struct LCM_BACKLIGHT_CUSTOM backlight_cust[6]; //bug621774, liuguohua.wt, add, 20200120, lcd bring up
 	unsigned int corner_pattern_tp_size;
 	void *corner_pattern_lt_addr;
 
@@ -770,6 +795,11 @@ struct LCM_PARAMS {
 
 	unsigned int hbm_en_time;
 	unsigned int hbm_dis_time;
+	
+	unsigned use_gpioID;
+	unsigned gpioID_value;
+	unsigned int vbias_level;
+	unsigned int default_panel_bl_off;  //bug621774, liuguohua.wt, add, 20200120, lcd bring up
 };
 
 
@@ -1009,10 +1039,15 @@ struct LCM_DRIVER {
 	void (*aod)(int enter);
 
 	/* /////////////DynFPS///////////////////////////// */
+	void (*set_cabc_cmdq)(void *handle, unsigned int enable);
+	void (*get_cabc_status)(int *status);
 	void (*dfps_send_lcm_cmd)(void *cmdq_handle,
 		unsigned int from_level, unsigned int to_level);
 	bool (*dfps_need_send_cmd)(
 	unsigned int from_level, unsigned int to_level);
+
+	/* /////////////suspend////////////////////////// */
+	void (*disable)(void);
 };
 
 /* LCM Driver Functions */
@@ -1028,6 +1063,9 @@ extern int display_bias_enable(void);
 extern int display_bias_disable(void);
 extern int display_bias_regulator_init(void);
 
+extern int lcm_power_disable(void);
+extern int lcm_power_enable(void);
+extern void lcm_reset_pin(unsigned int mode);
 
 
 #endif /* __LCM_DRV_H__ */

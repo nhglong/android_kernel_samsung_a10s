@@ -561,8 +561,11 @@ static void tcpc_event_init_work(struct work_struct *work)
 	tcpci_lock_typec(tcpc);
 	tcpci_event_init(tcpc);
 #ifdef CONFIG_TYPEC_WAIT_BC12
-	tcpc->chg_psy = devm_power_supply_get_by_phandle(
-		tcpc->dev.parent, "charger");
+	if (tcpc->chg_psy == NULL) {
+		tcpc->chg_psy = devm_power_supply_get_by_phandle(
+			tcpc->dev.parent, "charger");
+		pr_info("%s devm_power_supply_get_by_phandle %lu\n", __func__, sizeof(tcpc->chg_psy));
+	}
 	if (IS_ERR_OR_NULL(tcpc->chg_psy)) {
 		TCPC_ERR("%s get charger psy fail\n", __func__);
 		return;

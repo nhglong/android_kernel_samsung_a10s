@@ -152,6 +152,10 @@ ifeq ($(CONFIG_MTK_ECCCI_C2K), y)
 ccci_all-$(CCCI_OBJ) += modem_sys3.o
 endif
 
+ifeq ($(CONFIG_MTK_SRIL_SUPPORT), y)
+ccci_all-$(CCCI_OBJ) += modem_io_device.o
+endif
+
 # sub modules
 obj-$(CCCI_OBJ) += fsm/
 obj-$(CCCI_OBJ) += hif/

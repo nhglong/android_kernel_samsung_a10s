@@ -9,4 +9,6 @@
 #define MD_GENERATION       (6293)
 #define CCCI_EE_OFFSET_EPON_MD3 (0x464)
 
+#define ENABLE_MD_SEC_SMEM
+
 #endif

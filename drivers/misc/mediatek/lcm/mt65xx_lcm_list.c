@@ -21,6 +21,56 @@ enum LCM_DSI_MODE_CON lcm_dsi_mode;
 #define LCD_HW_ID_STATUS_ERROR  0x03
 
 struct LCM_DRIVER *lcm_driver_list[] = {
+//+bug621774, liuguohua.wt, add, 20210120, 1st lcd bring up
+#if defined(ILI7807G_HD_PLUS_DSI_INCELL_TXD_NA)
+	&ili7807g_hd_plus_dsi_vdo_txd_na_lcm_drv,
+#endif
+//-bug621774, liuguohua.wt, add, 20210120, 1st lcd bring up
+
+//+bug621774, liuguohua.wt, add, 20210125, 2nd lcd bring up
+#if defined(ILI7807G_HD_PLUS_DSI_INCELL_TRULY_NA)
+	&ili7807g_hd_plus_dsi_vdo_truly_na_lcm_drv,
+#endif
+//-bug621774, liuguohua.wt, add, 20210125, 2nd lcd bring up
+
+//+Bug 621774, chensibo.wt, ADD, 20210120, porting third lcd bringup
+#if defined(ILI7806S_HD_PLUS_DSI_INCELL_TXD_NA)
+	&ili7806s_hd_plus_dsi_vdo_txd_na_lcm_drv,
+#endif
+//-Bug 621774, chensibo.wt, ADD, 20210120, porting third lcd bringup
+
+#if defined(ILI9881H_HD_PLUS_DSI_INCELL_TRULY_M)
+	&ili9881h_hd_plus_dsi_vdo_truly_m_lcm_drv,
+#endif
+
+#if defined(ILI9881H_HD_PLUS_DSI_INCELL_TRULY)
+	&ili9881h_hd_plus_dsi_vdo_truly_lcm_drv,
+#endif
+
+#if defined(ICNL9911C_HD_PLUS_DSI_INCELL_TXD)
+	&icnl9911c_hd_plus_dsi_vdo_txd_lcm_drv,
+#endif
+
+#if defined(ILI9882N_HD_PLUS_DSI_INCELL_LS)
+	&ili9882n_hd_plus_dsi_vdo_ls_lcm_drv,
+#endif
+
+#if defined(ILI9882N_HD_PLUS_DSI_INCELL_TXD)
+	&ili9882n_hd_plus_dsi_vdo_txd_lcm_drv,
+#endif
+
+#if defined(ILI9881H_HD_PLUS_DSI_INCELL_TXD)
+	&ili9881h_hd_plus_dsi_vdo_txd_lcm_drv,
+#endif
+
+#if defined(FT8006P_HD_PLUS_DSI_INCELL_TIANMA)
+	&ft8006p_hd_plus_dsi_vdo_tianma_lcm_drv,
+#endif
+
+#if defined(HX83112A_HD_PLUS_DSI_INCELL_LIDE)
+	&hx83112a_hd_plus_dsi_vdo_lide_lcm_drv,
+#endif
+
 #if defined(NT36672AH_HDP_DSI_VDO_TCL_CSOT)
 	&nt36672ah_hdp_dsi_vdo_tcl_csot_lcm_drv,
 #endif
@@ -1186,12 +1236,19 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 	&sofeg01_fhdplus_dsi_cmd_samsung_lcm_drv,
 #endif
 
-#if defined(NT36672C_FHDP_DSI_VDO_AUO_CPHY_90HZ_TIANMA)
-	&nt36672c_fhdp_dsi_vdo_auo_cphy_90hz_tianma_lcm_drv,
-#endif
-
 #if defined(OPPO_TIANMA_TD4310_FHDP_DSI_VDO_RT5081)
 	&oppo_tianma_td4310_fhdp_dsi_vdo_rt5081_lcm_drv,
+#endif
+
+#if defined(TD4150_HDP_DSI_LM36274)
+	&td4150_hdp_dsi_lm36274_lcm_drv,
+#endif
+
+#if defined(ILI9882N_HDP_DSI_VDO_ILITEK_LM36274)
+	&ili9882n_hdp_dsi_vdo_ilitek_lm36274_lcm_drv,
+#endif
+#if defined(VIRTUAL_DSI_VDO_DEFAULT)
+	 &virtual_dsi_vdo_default,
 #endif
 };
 

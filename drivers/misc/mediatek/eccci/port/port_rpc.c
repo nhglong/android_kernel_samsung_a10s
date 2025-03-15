@@ -23,6 +23,8 @@
 #include <linux/of_irq.h>
 #include <linux/of_gpio.h>
 #include <linux/of_address.h>
+#include <linux/arm-smccc.h>
+#include <linux/soc/mediatek/mtk_sip_svc.h>
 #include "ccci_config.h"
 #include "ccci_common_config.h"
 
@@ -39,6 +41,19 @@
 #include "ccci_modem.h"
 #include "port_rpc.h"
 #define MAX_QUEUE_LENGTH 16
+#define MTK_RNG_MAGIC 0x74726e67
+
+static size_t mt_secure_call(size_t function_id,
+		size_t arg0, size_t arg1, size_t arg2,
+		size_t arg3, size_t r1, size_t r2, size_t r3)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(function_id, arg0, arg1,
+			arg2, arg3, r1, r2, r3, &res);
+
+	return res.a0;
+}
 
 static struct gpio_item gpio_mapping_table[] = {
 	{"GPIO_FDD_Band_Support_Detection_1",
@@ -89,6 +104,39 @@ static int get_md_adc_val(__attribute__((unused))unsigned int num)
 	return -1;
 }
 
+//+ExtB P210506-05247 penghui.wt add 2021/7/5 get wrong hwid
+int wt_get_md_adc_val(unsigned int num)
+{
+	int val = 0;
+	//CCCI_ERROR_LOG(0, RPC, "wt_get_md_adc_val: num=%d\n", num);
+	if (num == 2)
+	{
+		int vol = 0;
+		int ret = -1;
+
+		char* s = hw_id_vol_get();
+		//CCCI_ERROR_LOG(0, RPC, "wt_get_md_adc_val: s=%s\n", s);
+
+		ret = kstrtoint(s, 10, &vol);
+		//CCCI_ERROR_LOG(0, RPC, "wt_get_md_adc_val: ret=%d, vol=%d\n", ret ,vol);
+
+		if (ret == 0 && vol > 0)
+		{
+			val = (long long)vol * 4096 / (long long)1500000;
+			//CCCI_ERROR_LOG(0, RPC, "wt_get_md_adc_val: val=%d\n", val);
+		}
+		else
+		{
+			val = get_md_adc_val(num);
+		}
+	}
+	else
+	{
+		val = get_md_adc_val(num);
+	}
+	return val;
+}
+//-ExtB P210506-05247 penghui.wt add 2021/7/5 get wrong hwid
 
 static int get_td_eint_info(char *eint_name, unsigned int len)
 {
@@ -933,7 +981,13 @@ static void ccci_rpc_work_helper(struct port_t *port, struct rpc_pkt *pkt,
 			if (p_rpc_buf->op_id == IPC_RPC_GET_GPIO_VAL_OP)
 				val = get_md_gpio_val(num);
 			else if (p_rpc_buf->op_id == IPC_RPC_GET_ADC_VAL_OP)
+//+ExtB P210506-05247 penghui.wt mod 2021/7/5 get wrong hwid
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+				val = wt_get_md_adc_val(num);
+#else
 				val = get_md_adc_val(num);
+#endif
+//-ExtB P210506-05247 penghui.wt mod 2021/7/5 get wrong hwid
 			tmp_data[0] = val;
 			CCCI_DEBUG_LOG(md_id, RPC, "[0x%X]: num=%d, val=%d!\n",
 				p_rpc_buf->op_id, num, val);
@@ -1122,6 +1176,33 @@ static void ccci_rpc_work_helper(struct port_t *port, struct rpc_pkt *pkt,
 			memset(output, 0xF,
 				sizeof(struct ccci_rpc_md_dtsi_output));
 			get_md_dtsi_val(input, output);
+			break;
+		}
+	case IPC_RPC_TRNG:
+		{
+			unsigned int trng;
+
+			if (pkt_num != 1) {
+				CCCI_ERROR_LOG(md_id, RPC,
+				"invalid parameter for [0x%X]: pkt_num=%d!\n",
+					     p_rpc_buf->op_id, pkt_num);
+				tmp_data[0] = FS_PARAM_ERROR;
+				pkt_num = 0;
+				pkt[pkt_num].len = sizeof(unsigned int);
+				pkt[pkt_num++].buf = (void *)&tmp_data[0];
+				pkt[pkt_num].len = sizeof(unsigned int);
+				pkt[pkt_num++].buf = (void *)&tmp_data[0];
+				break;
+			}
+			trng = mt_secure_call(MTK_SIP_KERNEL_GET_RND,
+					MTK_RNG_MAGIC, 0, 0, 0, 0, 0, 0);
+			pkt_num = 0;
+			tmp_data[0] = 0;
+			tmp_data[1] = trng;
+			pkt[pkt_num].len = sizeof(unsigned int);
+			pkt[pkt_num++].buf = (void *)&tmp_data[0];
+			pkt[pkt_num].len = sizeof(unsigned int);
+			pkt[pkt_num++].buf = (void *)&tmp_data[1];
 			break;
 		}
 	case IPC_RPC_IT_OP:

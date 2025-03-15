@@ -68,4 +68,6 @@ int AudDrv_GPIO_RCVSPK_Select(int bEnable);
 int AudDrv_GPIO_HPDEPOP_Select(int bEnable);
 
 int audio_drv_gpio_aud_clk_pull(bool high);
+//Bug 621775 fujiawen.wt,add,20210129,add hac support
+int HAC_Amp_Change(int bEnable);
 #endif

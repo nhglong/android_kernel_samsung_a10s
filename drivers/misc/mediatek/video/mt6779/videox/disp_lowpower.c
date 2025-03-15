@@ -1364,8 +1364,8 @@ void primary_display_idlemgr_kick(const char *source, int need_lock)
 	mmprofile_log_ex(ddp_mmp_get_events()->idlemgr, MMPROFILE_FLAG_PULSE,
 			 1, 0);
 
-	scnprintf(log, sizeof(log), "[kick]%s kick at %lld\n",
-		  source, sched_clock());
+	snprintf(log, sizeof(log), "[kick]%s kick at %lld\n",
+		 source, sched_clock());
 	kick_logger_dump(log);
 
 	/*
@@ -1777,8 +1777,8 @@ void external_display_idlemgr_kick(const char *source, int need_lock)
 	char log[128] = "";
 
 	/* DISP_SYSTRACE_BEGIN("%s\n", __func__); */
-	scnprintf(log, sizeof(log), "[kick]%s kick at %lld\n",
-		  source, sched_clock());
+	snprintf(log, sizeof(log), "[kick]%s kick at %lld\n",
+		 source, sched_clock());
 	kick_logger_dump(log);
 	/*
 	 * get primary lock to protect idlemgr_last_kick_time and

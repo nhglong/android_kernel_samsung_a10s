@@ -110,10 +110,14 @@ int disp_unregister_irq_callback(DDP_IRQ_CALLBACK cb)
 		char msg[len];
 		int n = 0;
 
-		n = scnprintf(msg, len,
+		n = snprintf(msg, len,
 			     "Try to unregister callback function %p which was not registered\n",
 			     cb);
-		DISP_LOG_E("%s", msg);
+		if (n < 0) {
+			DISP_LOG_E("[%s %d]snprintf err:%d\n",
+				   __func__, __LINE__, n);
+		} else
+			DISP_LOG_E("%s", msg);
 		return -1;
 	}
 	return 0;
@@ -170,10 +174,14 @@ int disp_unregister_module_irq_callback(enum DISP_MODULE_ENUM module,
 		char msg[len];
 		int n = 0;
 
-		n = scnprintf(msg, len,
+		n = snprintf(msg, len,
 			"try to unregister callback function but not registered. module=%d cb=%p\n",
 			module, cb);
-		DISP_LOG_E("%s", msg);
+		if (n < 0) {
+			DISP_LOG_E("[%s %d]snprintf err:%d\n",
+				   __func__, __LINE__, n);
+		} else
+			DISP_LOG_E("%s", msg);
 		return -1;
 	}
 	return 0;
@@ -491,15 +499,15 @@ irqreturn_t disp_irq_handler(int irq, void *dev_id)
 		reg_val = DISP_REG_GET(DISP_REG_CONFIG_MMSYS_INTSTA) & 0x7;
 		DISP_CPU_REG_SET(DISP_REG_CONFIG_MMSYS_INTSTA, ~reg_val);
 		if (reg_val & (1 << 0)) {
-			n = scnprintf(msg, len, "MMSYS to MFG APB TX Error, ");
-			n += scnprintf(msg + n, len - n,
+			n = snprintf(msg, len, "MMSYS to MFG APB TX Error, ");
+			n += snprintf(msg + n, len - n,
 				      "MMSYS clock off but MFG clock on!\n");
 			DDP_PR_ERR("%s", msg);
 		}
 
 		if (reg_val & (1 << 1)) {
-			n = scnprintf(msg, len, "MMSYS to MJC APB TX Error, ");
-			n += scnprintf(msg + n, len - n,
+			n = snprintf(msg, len, "MMSYS to MJC APB TX Error, ");
+			n += snprintf(msg + n, len - n,
 				      "MMSYS clock off but MJC clock on!\n");
 			DDP_PR_ERR("%s", msg);
 		}

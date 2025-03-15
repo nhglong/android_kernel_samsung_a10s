@@ -23,7 +23,7 @@
 		mt6370pd,intr_gpio = <&pio 24 0x0>;
 		mt6370pd,intr_gpio_num = <24>;
 
-		charger = <&mt6370_chg>;
+		charger = <&mtk_charger_type>;
 
 		pd-data {
 			pd,vid = <0x29cf>;

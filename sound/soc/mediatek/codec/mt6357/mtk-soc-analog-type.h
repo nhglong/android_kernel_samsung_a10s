@@ -112,6 +112,8 @@ enum audio_analog_device_type {
 	AUDIO_ANALOG_DEVICE_IN_PREAMP_R = 18,
 	AUDIO_ANALOG_DEVICE_IN_DIGITAL_MIC = 19,
 	AUDIO_ANALOG_DEVICE_RECEIVER_SPEAKER_SWITCH = 20,
+	//Bug 621775 fujiawen.wt,add,20210129,add hac support
+	AUDIO_ANALOG_DEVICE_OUT_RECEIVER_HAC = 21,
 	AUDIO_ANALOG_DEVICE_MAX
 };
 
@@ -184,7 +186,9 @@ struct mt6357_priv {
 	struct device *dev;
 	struct regmap *regmap;
 	struct iio_channel *codec_auxadc, *accdet_auxadc;
+	struct nvmem_device *hp_efuse;
 	int mtkaif_protocol;
+
 };
 
 #endif

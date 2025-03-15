@@ -112,7 +112,8 @@ enum ACDK_CAMERA_OPERATION_MODE_ENUM {
  ************************************************************************/
 
 /*  */
-#define MAX_NUM_OF_SUPPORT_SENSOR 16
+//bug 621775,liuxiangyin, mod, 20210202, for N21 camera bringup
+#define MAX_NUM_OF_SUPPORT_SENSOR 32
 /*  */
 #define SENSOR_CLOCK_POLARITY_HIGH    0
 #define SENSOR_CLOCK_POLARITY_LOW 1

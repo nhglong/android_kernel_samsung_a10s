@@ -146,8 +146,6 @@ int get_dspscene_by_dspdaiid(int id)
 		return TASK_SCENE_CALL_FINAL;
 	case AUDIO_TASK_KTV_ID:
 		return TASK_SCENE_KTV;
-	case AUDIO_TASK_CAPTURE_RAW_ID:
-		return TASK_SCENE_CAPTURE_RAW;
 	default:
 		pr_warn("%s() err\n", __func__);
 		return -1;
@@ -178,8 +176,6 @@ int get_dspdaiid_by_dspscene(int dspscene)
 		return AUDIO_TASK_CALL_FINAL_ID;
 	case TASK_SCENE_KTV:
 		return AUDIO_TASK_KTV_ID;
-	case TASK_SCENE_CAPTURE_RAW:
-		return AUDIO_TASK_CAPTURE_RAW_ID;
 	default:
 		pr_info("%s() dspscene[%d] err\n", __func__, dspscene);
 		return -1;
@@ -265,7 +261,7 @@ static int set_aud_buf_attr(struct audio_hw_buffer *audio_hwbuf,
 	int ret = 0;
 
 	ret = set_afe_audio_pcmbuf(&dsp_memif->audio_afepcm_buf,
-				   substream, params);
+				   substream);
 	if (ret < 0) {
 		pr_info("set_afe_audio_pcmbuf fail\n");
 		return -1;

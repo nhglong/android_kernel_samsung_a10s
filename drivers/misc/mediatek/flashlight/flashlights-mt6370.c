@@ -37,6 +37,8 @@
 #define MT6370_CHANNEL_CH2 1
 #define MT6370_CHANNEL_ALL 2
 
+#define SIGNAL_LED_TWO_CHANNAL 1  //Bug 491913, sunhushan.wt, ADD, 2020.03.10, change single channel to double channel
+
 #define MT6370_NONE (-1)
 #define MT6370_DISABLE 0
 #define MT6370_ENABLE 1
@@ -60,6 +62,7 @@ static unsigned int mt6370_timeout_ms[MT6370_CHANNEL_NUM];
 /* define usage count */
 static int use_count;
 static int fd_use_count;
+static int is_ss_torch = 0; //bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
 
 /* define RTK flashlight device */
 static struct flashlight_device *flashlight_dev_ch1;
@@ -129,6 +132,16 @@ static int mt6370_en_ch2;
 static int mt6370_level_ch1;
 static int mt6370_level_ch2;
 
+//+bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
+void set_mt6370_ch1_mode(int mode)
+{
+	mt6370_en_ch1 = mode;
+}
+void set_mt6370_ch2_mode(int mode)
+{
+	mt6370_en_ch2 = mode;
+}
+//-bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
 static int mt6370_is_charger_ready(void)
 {
 	if (flashlight_is_ready(flashlight_dev_ch1) &&
@@ -157,7 +170,7 @@ static int mt6370_verify_level(int level)
 }
 
 /* flashlight enable function */
-static int mt6370_enable(void)
+int mt6370_enable(void)
 {
 	int ret = 0;
 	enum flashlight_mode mode = FLASHLIGHT_MODE_TORCH;
@@ -266,7 +279,7 @@ static int mt6370_disable_all(void)
 	return ret;
 }
 
-static int mt6370_disable(int channel)
+int mt6370_disable(int channel)
 {
 	int ret = 0;
 
@@ -330,9 +343,39 @@ static int mt6370_set_level_ch2(int level)
 
 	return 0;
 }
+//+bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
+void set_torch(){
+    is_ss_torch = 1;
+}
+//-bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
 
-static int mt6370_set_level(int channel, int level)
+int mt6370_set_level(int channel, int level)
 {
+	//+bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
+	//+Bug 491913, sunhushan.wt, ADD, 2020.03.10, change single channel to double channel
+	#if SIGNAL_LED_TWO_CHANNAL
+
+	if(channel < 0 || channel > MT6370_CHANNEL_NUM){
+	pr_err("Error channel\n");
+	return -1;
+	}else{
+	//+Extb 200320-03984, sunhushan.wt, ADD, 2020.4.2, modify for flash torch light level is same in 1 and 2
+	if (is_ss_torch == 1){
+		mt6370_set_level_ch1(level);
+		mt6370_set_level_ch2(level);
+	}else{
+		mt6370_set_level_ch1((level+7)/2);
+		mt6370_set_level_ch2((level+7)/2);
+	}
+	is_ss_torch = 0;
+
+	}
+	pr_info("go SIGNAL_LED_TWO_CHANNAL is_ss_torch=%d\n",is_ss_torch);
+	//-Extb 200320-03984, sunhushan.wt, ADD, 2020.4.2, modify for flash torch light level is same in 1 and 2
+	//-bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
+	return 0;
+
+	#else
 	if (channel == MT6370_CHANNEL_CH1)
 		mt6370_set_level_ch1(level);
 	else if (channel == MT6370_CHANNEL_CH2)
@@ -343,6 +386,8 @@ static int mt6370_set_level(int channel, int level)
 	}
 
 	return 0;
+	#endif
+	//-Bug 491913, sunhushan.wt, MODIFY, 2020.03.10, change single channel to double channel
 }
 
 static int mt6370_set_scenario(int scenario)
@@ -497,7 +542,16 @@ static int mt6370_operate(int channel, int enable)
 			mt6370_timeout_ms[MT6370_CHANNEL_CH1] = 0;
 		}
 	}
+	//+bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
+	//+Bug 491913, sunhushan.wt, ADD, 2020.03.10, change single channel to double channel
+	#if SIGNAL_LED_TWO_CHANNAL
 
+	mt6370_en_ch2 = mt6370_en_ch1;
+	mt6370_timeout_ms[MT6370_CHANNEL_CH2] = mt6370_timeout_ms[MT6370_CHANNEL_CH1];
+
+	#endif
+	//-Bug 491913, sunhushan.wt, ADD, 2020.03.10, change single channel to double channel
+	//-bug 627637,lintaicheng.wt, add, 2020/02/27, add for n21 flashlight bring up
 	pr_debug("en_ch(%d,%d), decouple:%d\n",
 		mt6370_en_ch1, mt6370_en_ch2, mt6370_decouple_mode);
 
@@ -778,6 +832,44 @@ err_node_put:
 	return -EINVAL;
 }
 
+//+bug 621775, lintaicheng.wt, add, 2021/03/16, add flashlight device node for factory mode
+static int led_flash_state = 0;
+static ssize_t led_flash_show(struct device *dev, struct device_attribute *attr, char *buf){
+    return sprintf(buf, "%d\n", led_flash_state);
+}
+//store
+static ssize_t led_flash_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size){
+
+	int temp;
+	int led_flash_level =0;
+	temp = simple_strtol(buf, NULL, 10);
+	led_flash_level = temp;
+	mt6370_set_driver(1);
+	if(led_flash_level == 1)
+	{
+		mt6370_decouple_mode = 2;
+		mt6370_set_level(1, 0);
+		mt6370_set_level(0, 3);
+		mt6370_operate(1, 0);
+		mt6370_operate(0, 1);
+	}
+	else if(led_flash_level == 0)
+	{
+
+                mt6370_decouple_mode = 0;//P210715-05562,dengyixuan.wt,add ,2021/7/31 ,flash always on in camera
+		mt6370_disable(MT6370_CHANNEL_ALL);
+		mt6370_timer_cancel(MT6370_CHANNEL_CH1);
+		mt6370_timer_cancel(MT6370_CHANNEL_CH2);
+	}
+	else
+	pr_debug("store error.\n");
+
+	return size;
+}
+
+static DEVICE_ATTR(led_flash, 0664, led_flash_show, led_flash_store);
+//-bug 621775, lintaicheng.wt, add, 2021/03/16, add flashlight device node for factory mode
+
 static int mt6370_probe(struct platform_device *pdev)
 {
 	struct mt6370_platform_data *pdata = dev_get_platdata(&pdev->dev);
@@ -842,6 +934,15 @@ static int mt6370_probe(struct platform_device *pdev)
 		if (flashlight_dev_register(MT6370_NAME, &mt6370_ops))
 			return -EFAULT;
 	}
+    //+bug 621775, lintaicheng.wt, add, 2021/03/16, add flashlight device node for factory mode
+    ret = device_create_file(&pdev->dev, &dev_attr_led_flash);
+    if(ret < 0){
+        pr_err("=== create torch_node file failed ===\n");
+    }
+	if (ss_flashlight_node_create() < 0){
+		pr_err( "ss_flashlight_node_create failed!\n");
+	}
+	//-bug 621775, lintaicheng.wt, add, 2021/03/16, add flashlight device node for factory mode
 
 	pr_debug("Probe done.\n");
 

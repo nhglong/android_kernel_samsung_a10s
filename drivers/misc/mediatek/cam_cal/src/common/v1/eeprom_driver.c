@@ -40,6 +40,9 @@
 #define CAM_CAL_I2C_DEV3_NAME "CAM_CAL_DEV3"
 #define CAM_CAL_I2C_DEV4_NAME "CAM_CAL_DEV4"
 
+#define LOG_INF(format, args...) pr_debug(PFX "[%s] " format, __func__, ##args)
+#define LOG_DBG(format, args...) pr_err(PFX "[%s] " format, __func__, ##args)
+
 static dev_t g_devNum = MKDEV(CAM_CAL_DEV_MAJOR_NUMBER, 0);
 static struct cdev *g_charDrv;
 static struct class *g_drvClass;
@@ -362,6 +365,213 @@ struct i2c_driver EEPROM_HW_i2c_driver3 = {
 	.id_table = EEPROM_HW_i2c_id3,
 };
 
+//+bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
+struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMainData = NULL;
+struct stCAM_CAL_DATAINFO_STRUCT *g_eepromSubData = NULL;
+struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMainDepthData = NULL;
+struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMainWideData = NULL;
+struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMainMicroData = NULL;
+
+static  void EEPROM_reset_cmd_info_ex
+	(unsigned int sensorID, unsigned int deviceID){
+	int i = 0;
+	for (i = 0; i < IMGSENSOR_SENSOR_IDX_MAX_NUM; i++) {
+		if ((g_camCalDrvInfo[i].deviceID == deviceID)&&(sensorID == g_camCalDrvInfo[i].sensorID)){
+			g_camCalDrvInfo[i].deviceID = 0;
+			g_camCalDrvInfo[i].sensorID = 0;
+		}
+	}
+}
+
+void dumpEEPROMData(int u4Length,u8* pu1Params)
+{
+#ifdef DUMP_EEPROM_DATA_ENABLE
+	int i = 0;
+	for(i = 0; i < u4Length; i += 16){
+		if(u4Length - i  >= 16){
+			pr_info("eeprom[%d-%d]:0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x ",
+			i,i+15,pu1Params[i],pu1Params[i+1],pu1Params[i+2],pu1Params[i+3],pu1Params[i+4],pu1Params[i+5],pu1Params[i+6]
+			,pu1Params[i+7],pu1Params[i+8],pu1Params[i+9],pu1Params[i+10],pu1Params[i+11],pu1Params[i+12],pu1Params[i+13],pu1Params[i+14]
+			,pu1Params[i+15]);
+		}else{
+			int j = i;
+			for(;j < u4Length;j++)
+			pr_info("eeprom[%d] = 0x%2x ",j,pu1Params[j]);
+		}
+	}
+	LOG_INF("\n");
+#endif
+}
+
+int imgSensorCheckEepromData(struct stCAM_CAL_DATAINFO_STRUCT* pData, struct stCAM_CAL_CHECKSUM_STRUCT* cData){
+	int i = 0;
+	int length = 0;
+	int count;
+	u32 sum = 0;
+
+	if((pData != NULL)&&(pData->dataBuffer != NULL)&&(cData != NULL)){
+		u8* buffer = pData->dataBuffer;
+		//verity validflag and checksum
+		for((count = 0);count < MAX_ITEM;count++){
+			if(cData[count].item < MAX_ITEM) {
+				if(buffer[cData[count].flagAdrees]!= cData[count].validFlag){
+					LOG_INF("invalid otp data cItem=%d,flag=%d failed\n", cData[count].item,buffer[cData[count].flagAdrees]);
+					return -ENODEV;
+				} else {
+					LOG_INF("check cTtem=%d,flag=%d otp flag data successful!\n", cData[count].item,buffer[cData[count].flagAdrees]);
+				}
+				sum = 0;
+				length = cData[count].endAdress - cData[count].startAdress;
+				for(i = 0;i <= length;i++){
+					sum += buffer[cData[count].startAdress+i];
+				}
+				if(((sum%0xff)+1)!= buffer[cData[count].checksumAdress]){
+					LOG_INF("checksum cItem=%d,0x%x,length = 0x%x failed\n",cData[count].item,sum,length);
+					return -ENODEV;
+				} else {
+					LOG_INF("checksum cItem=%d,0x%x,length = 0x%x successful!\n",cData[count].item,sum,length);
+				}
+			} else {
+				break;
+			}
+		}
+	} else {
+		LOG_INF("some data not inited!\n");
+		return -ENODEV;
+	}
+
+	LOG_INF("sensor[0x%x][0x%x] eeprom checksum success\n", pData->sensorID, pData->deviceID);
+
+	return 0;
+}
+
+int imgSensorReadEepromData(struct stCAM_CAL_DATAINFO_STRUCT* pData, struct stCAM_CAL_CHECKSUM_STRUCT* checkData){
+	struct stCAM_CAL_CMD_INFO_STRUCT *pcmdInf = NULL;
+	int i4RetValue = -1;
+	u32 vendorID = 0;
+	u32 vcmID = 0;
+	u8 tmpBuf[4] = {0};
+
+	if((pData == NULL)||(checkData == NULL)){
+		LOG_INF("pData or checkData not inited!\n");
+		return -EFAULT;
+	}
+
+	LOG_INF("SensorID=%x DeviceID=%x\n",pData->sensorID, pData->deviceID);
+
+	pcmdInf = EEPROM_get_cmd_info_ex(pData->sensorID,pData->deviceID);
+	if (pcmdInf != NULL) {
+		LOG_INF("i2cAddr=0x%x sensorID=0x%x\n",pcmdInf->i2cAddr, pcmdInf->sensorID);
+		if(EEPROM_set_i2c_bus(pData->deviceID, pcmdInf) != 0) {
+			LOG_INF("deviceID Error!\n");
+			return -EFAULT;
+		}
+	}
+
+	if (pcmdInf != NULL) {
+		if (pcmdInf->readCMDFunc != NULL){
+			if (pData->dataBuffer == NULL){
+				pData->dataBuffer = kmalloc(pData->dataLength, GFP_KERNEL);
+				if (pData->dataBuffer == NULL) {
+					LOG_INF("pData->dataBuffer is malloc fail\n");
+					return -EFAULT;
+				}
+			}
+			//verity vendorID
+			i4RetValue = pcmdInf->readCMDFunc(pcmdInf->client, pData->vendorByte[0], &tmpBuf[0], 1);
+			if(i4RetValue != 1){
+				LOG_INF("vendorID read falied 0x%x != 0x%x\n",tmpBuf[0], pData->sensorVendorid >> 24);
+				EEPROM_reset_cmd_info_ex(pData->sensorID,pData->deviceID);
+				return -EFAULT;
+			}
+			vendorID = tmpBuf[0];
+			if(vendorID != pData->sensorVendorid >> 24){
+				LOG_INF("vendorID cmp falied 0x%x != 0x%x\n",vendorID, pData->sensorVendorid >> 24);
+				EEPROM_reset_cmd_info_ex(pData->sensorID,pData->deviceID);
+				return -EFAULT;
+			}
+                        //+OA6649398,zhouyikuan.wt,ADD,2020/09/08,hi1336_txd_jct sensor bringup
+			//verity vcmID
+			i4RetValue = pcmdInf->readCMDFunc(pcmdInf->client, pData->vendorByte[3], &tmpBuf[3], 1);
+			if(i4RetValue != 1){
+				LOG_INF("vcmID read falied 0x%x != 0x%x\n",tmpBuf[3], pData->sensorVendorid);
+				EEPROM_reset_cmd_info_ex(pData->sensorID,pData->deviceID);
+				return -EFAULT;
+			}
+			vcmID = tmpBuf[3];
+			if(vcmID != (pData->sensorVendorid&0xff)){
+				LOG_INF("vcmID cmp falied 0x%x != 0x%x\n",vcmID, (pData->sensorVendorid&0xff));
+				EEPROM_reset_cmd_info_ex(pData->sensorID,pData->deviceID);
+				return -EFAULT;
+			}
+                        //-OA6649398,zhouyikuan.wt,ADD,2020/09/08,hi1336_txd_jct sensor bringup
+			//get eeprom data
+			i4RetValue = pcmdInf->readCMDFunc(pcmdInf->client, 0, pData->dataBuffer, pData->dataLength);
+			if(i4RetValue != pData->dataLength){
+				kfree(pData->dataBuffer);
+				pData->dataBuffer = NULL;
+				LOG_INF("readCMDFunc failed\n");
+				EEPROM_reset_cmd_info_ex(pData->sensorID,pData->deviceID);
+				return -EFAULT;
+			}else{
+				if(imgSensorCheckEepromData(pData,checkData) != 0){
+					kfree(pData->dataBuffer);
+					pData->dataBuffer = NULL;
+					LOG_INF("checksum failed\n");
+					EEPROM_reset_cmd_info_ex(pData->sensorID,pData->deviceID);
+					return -EFAULT;
+				}
+				LOG_INF("SensorID=%x DeviceID=%x read otp data success\n",pData->sensorID, pData->deviceID);
+			}
+		} else {
+			LOG_INF("pcmdInf->readCMDFunc == NULL\n");
+		}
+	} else {
+		LOG_INF("pcmdInf == NULL\n");
+	}
+
+	return i4RetValue;
+}
+
+int imgSensorSetEepromData(struct stCAM_CAL_DATAINFO_STRUCT* pData){
+	int i4RetValue = 0;
+	LOG_INF("pData->deviceID = %d\n",pData->deviceID);
+	if(pData->deviceID == 0x01){
+		if(g_eepromMainData != NULL){
+			return -ETXTBSY;
+		}
+		g_eepromMainData = pData;
+	}
+	else if(pData->deviceID == 0x02) {
+		if(g_eepromSubData != NULL){
+			return -ETXTBSY;
+		}
+		g_eepromSubData = pData;
+	}
+	else if(pData->deviceID == 0x04){
+		if(g_eepromMainDepthData != NULL){
+			return -ETXTBSY;
+		}
+		g_eepromMainDepthData = pData;
+	}else if(pData->deviceID == 0x08){
+		if(g_eepromMainWideData != NULL){
+			return -ETXTBSY;
+		}
+		g_eepromMainWideData = pData;
+	}else if(pData->deviceID == 0x10){
+		if(g_eepromMainMicroData != NULL){
+			return -ETXTBSY;
+		}
+		g_eepromMainMicroData = pData;
+	}else{
+	    LOG_INF("we don't have this devices\n");
+	    return -ENODEV;
+	}
+	if(pData->dataBuffer)
+		dumpEEPROMData(pData->dataLength,pData->dataBuffer);
+	return i4RetValue;
+}
+//-bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
 
 /*******************************************************
  * EEPROM_HW_probe
@@ -655,9 +865,75 @@ static long EEPROM_drv_ioctl(struct file *file,
 #ifdef CAM_CALGETDLT_DEBUG
 		do_gettimeofday(&ktv1);
 #endif
-
-		pr_debug("SensorID=%x DeviceID=%x\n",
-			ptempbuf->sensorID, ptempbuf->deviceID);
+		//+bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
+		LOG_INF("SensorID=%x DeviceID=%x\n", ptempbuf->sensorID, ptempbuf->deviceID);
+		if((ptempbuf->deviceID == 0x01)&&(g_eepromMainData != NULL)){
+			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
+				//LOG_INF("read in main\n");
+				if((g_eepromMainData->dataBuffer)&&(totalLength <= g_eepromMainData->dataLength)){
+				if(ptempbuf->u4Offset == 1){
+					memcpy(pu1Params,(u8*)&g_eepromMainData->sensorVendorid,4);
+				} else {
+					memcpy(pu1Params,g_eepromMainData->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
+				}
+				i4RetValue = ptempbuf->u4Length;
+			} else {
+				LOG_INF("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMainData->dataBuffer,totalLength,g_eepromMainData->dataLength);
+			}
+		} else if((ptempbuf->deviceID == 0x02)&&(g_eepromSubData != NULL)) {
+			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
+			if((g_eepromSubData->dataBuffer)&&(totalLength <= g_eepromSubData->dataLength)){
+				//LOG_INF("read in sub\n");
+				if(ptempbuf->u4Offset == 1){
+					memcpy(pu1Params,(u8*)&g_eepromSubData->sensorVendorid,4);
+				} else {
+					memcpy(pu1Params,g_eepromSubData->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
+				}
+				i4RetValue = ptempbuf->u4Length;
+			} else {
+				LOG_INF("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromSubData->dataBuffer,totalLength,g_eepromSubData->dataLength);
+			}
+		} else if((ptempbuf->deviceID == 0x04)&&(g_eepromMainDepthData != NULL)){
+			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
+			//LOG_INF("read in main2\n");
+			if((g_eepromMainDepthData->dataBuffer)&&(totalLength <= g_eepromMainDepthData->dataLength)){
+				if(ptempbuf->u4Offset == 1){
+					memcpy(pu1Params,(u8*)&g_eepromMainDepthData->sensorVendorid,4);
+				} else {
+					memcpy(pu1Params,g_eepromMainDepthData->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
+				}
+				i4RetValue = ptempbuf->u4Length;
+			} else {
+				LOG_INF("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMainDepthData->dataBuffer,totalLength,g_eepromMainDepthData->dataLength);
+			}
+		} else if((ptempbuf->deviceID == 0x08)&&(g_eepromMainWideData != NULL)){
+			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
+			//LOG_INF("read in main2\n");
+			if((g_eepromMainWideData->dataBuffer)&&(totalLength <= g_eepromMainWideData->dataLength)){
+				if(ptempbuf->u4Offset == 1){
+					memcpy(pu1Params,(u8*)&g_eepromMainWideData->sensorVendorid,4);
+				} else {
+					memcpy(pu1Params,g_eepromMainWideData->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
+				}
+				i4RetValue = ptempbuf->u4Length;
+			} else {
+				LOG_INF("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMainWideData->dataBuffer,totalLength,g_eepromMainWideData->dataLength);
+			}
+		}else if((ptempbuf->deviceID == 0x10)&&(g_eepromMainMicroData != NULL)){
+			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
+			//LOG_INF("read in main2\n");
+			if((g_eepromMainMicroData->dataBuffer)&&(totalLength <= g_eepromMainMicroData->dataLength)){
+				if(ptempbuf->u4Offset == 1){
+					memcpy(pu1Params,(u8*)&g_eepromMainMicroData->sensorVendorid,4);
+				} else {
+					memcpy(pu1Params,g_eepromMainMicroData->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
+				}
+				i4RetValue = ptempbuf->u4Length;
+			} else {
+				LOG_INF("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMainMicroData->dataBuffer,totalLength,g_eepromMainMicroData->dataLength);
+			}
+		}else {
+		//-bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
 		pcmdInf = EEPROM_get_cmd_info_ex(
 			ptempbuf->sensorID,
 			ptempbuf->deviceID);
@@ -697,6 +973,7 @@ static long EEPROM_drv_ioctl(struct file *file,
 				kfree(pBuff);
 				kfree(pu1Params);
 				return -EFAULT;
+				}
 			}
 		}
 #ifdef CAM_CALGETDLT_DEBUG

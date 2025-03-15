@@ -125,10 +125,16 @@ static int fl_enable(struct flashlight_dev *fdev, int enable)
 #ifdef CONFIG_MTK_FLASHLIGHT_PT
 	if (pt_is_low(pt_low_vol, pt_low_bat, pt_over_cur) == 2)
 		if (enable) {
+			//+P210619-00213 , add by dengyixuan.wt , 2021/06/29 , low power flash on
+			#if defined(CONFIG_WT_PROJECT_S96717RA1) || defined(CONFIG_MTK_96116_CAMERA)
+			enable = 1;
+			#else
 			enable = 0;
 			pr_info("Failed to enable since pt(%d,%d,%d), pt strict(%d)\n",
 					pt_low_vol, pt_low_bat,
 					pt_over_cur, pt_strict);
+			#endif
+			//-P210619-00213 , add by dengyixuan.wt , 2021/06/29 , low power flash on
 		}
 #endif
 

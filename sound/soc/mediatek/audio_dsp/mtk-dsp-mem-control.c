@@ -363,8 +363,6 @@ int scp_reservedid_to_dsp_daiid(int id)
 		return AUDIO_TASK_CALL_FINAL_ID;
 	case ADSP_KTV_MEM_ID:
 		return AUDIO_TASK_KTV_ID;
-	case AUDIO_TASK_CAPTURE_RAW_ID:
-		return AUDIO_TASK_CAPTURE_RAW_ID;
 	default:
 		pr_warn("%s id = %d\n", __func__, id);
 		return -1;
@@ -397,8 +395,6 @@ int dsp_daiid_to_scp_reservedid(int task_dai_id)
 		return ADSP_CALL_FINAL_MEM_ID;
 	case AUDIO_TASK_KTV_ID:
 		return ADSP_KTV_MEM_ID;
-	case AUDIO_TASK_CAPTURE_RAW_ID:
-		return ADSP_CAPTURE_RAW_MEM_ID;
 	default:
 		pr_warn("%s id = %d\n", __func__, task_dai_id);
 		return -1;
@@ -535,20 +531,6 @@ int get_afememul_by_afe_taskid(int task_id)
 }
 
 int get_afememref_by_afe_taskid(int task_id)
-{
-	int ret = 0;
-	struct mtk_adsp_task_attr *task_attr =
-		mtk_get_adsp_task_attr(task_id);
-
-	if (task_id > AUDIO_TASK_DAI_NUM || !task_attr) {
-		pr_info("%s id = %d\n", __func__, task_id);
-		return -1;
-	}
-	ret = task_attr->afe_memif_ref;
-	return ret;
-}
-
-int get_aferefmem_by_afe_taskid(int task_id)
 {
 	int ret = 0;
 	struct mtk_adsp_task_attr *task_attr =

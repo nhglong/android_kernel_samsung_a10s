@@ -686,12 +686,16 @@ static void ddp_check_path_l(int *module_list)
 					break;
 
 				path_error += 1;
-				n = scnprintf(msg, len,
+				n = snprintf(msg, len,
 					"error:out_s %s not connect to %s, expect=0x%x, real=0x%x\n",
 					ddp_get_module_name(module_list[i]),
 					ddp_get_module_name(module_list[step]),
 					k, DISP_REG_GET(sel_out_map[j].reg));
-				DDPDUMP("%s", msg);
+				if (n < 0) {
+					DISP_LOG_E("[%s %d]snprintf err:%d\n",
+						   __func__, __LINE__, n);
+				} else
+					DDPDUMP("%s", msg);
 				break;
 			}
 		}
@@ -718,12 +722,16 @@ static void ddp_check_path_l(int *module_list)
 					break;
 
 				path_error += 1;
-				n = scnprintf(msg, len,
+				n = snprintf(msg, len,
 					"error:in_s %s not conn to %s, expect0x%x,real0x%x\n",
 					ddp_get_module_name(module_list[step]),
 					ddp_get_module_name(module_list[i]),
 					k, DISP_REG_GET(sel_in_map[j].reg));
-				DDPDUMP("%s", msg);
+				if (n < 0) {
+					DISP_LOG_E("[%s %d]snprintf err:%d\n",
+						   __func__, __LINE__, n);
+				} else
+					DDPDUMP("%s", msg);
 				break;
 			}
 		}

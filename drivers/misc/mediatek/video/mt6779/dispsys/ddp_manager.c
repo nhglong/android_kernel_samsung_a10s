@@ -1246,11 +1246,15 @@ int dpmgr_path_config(disp_path_handle dp_handle,
 	list = ddp_get_scenario_list(phandle->scenario);
 	m_num = ddp_get_module_num(phandle->scenario);
 
-	n = scnprintf(msg, len,
+	n = snprintf(msg, len,
 		     "path config ovl %d,rdma %d,wdma %d,dst %d on path handle %p scenario %s\n",
 		     config->ovl_dirty, config->rdma_dirty,
 		     config->wdma_dirty, config->dst_dirty,
 		     phandle, ddp_get_scenario_name(phandle->scenario));
+	if (n < 0) {
+		DISP_LOG_E("[%s %d]snprintf error:%d\n", n);
+		n = 0;
+	}
 	DISP_LOG_V("%s", msg);
 
 	memcpy(&phandle->last_config, config, sizeof(*config));

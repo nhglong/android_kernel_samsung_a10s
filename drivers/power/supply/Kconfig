@@ -807,4 +807,21 @@ config CHARGER_BQ25601
 	  It depends on
 	  the config MTK_CHARGER.
 
+config MTK_DISABLE_TEMP_PROTECT
+	bool "Charger Driver for MTK_DISABLE_TEMP_PROTECT"
+	depends on MTK_CHARGER
+	help
+	  Say Yes to enable MTK_DISABLE_TEMP_PROTECT.
+	  It depends on config MTK_CHARGER.
+
+config AFC_CHARGER
+	bool "Using AFC charger driver"
+	default n
+        depends on MTK_CHARGER
+	help
+	  If you say yes here you will get support for
+	  the AFC charger driver.
+
 endif # POWER_SUPPLY
+
+source "drivers/power/supply/sm/sm5714/Kconfig"

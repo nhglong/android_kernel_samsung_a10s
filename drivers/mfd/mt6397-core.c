@@ -151,6 +151,9 @@ static const struct resource mt6357_lbat_service_resources[] = {
 	DEFINE_RES_IRQ_NAMED(MT6357_IRQ_BAT_L, "bat_l"),
 };
 
+static const struct resource mt6357_leds_resources[] = {
+};
+
 static const struct resource mt6359_lbat_service_resources[] = {
 	DEFINE_RES_IRQ_NAMED(MT6359_IRQ_BAT_H, "bat_h"),
 	DEFINE_RES_IRQ_NAMED(MT6359_IRQ_BAT_L, "bat_l"),
@@ -333,6 +336,11 @@ static const struct mfd_cell mt6357_devs[] = {
 		.name = "mt6357_ts_buck2",
 		.of_compatible = "mediatek,mt6357_ts_buck2"
 	}, {
+		.name = "leds-mt6357",
+		.of_compatible = "mediatek,mt6357_leds",
+		.num_resources = ARRAY_SIZE(mt6357_leds_resources),
+		.resources = mt6357_leds_resources
+	}, {
 		.name = "mtk-pmic-keys",
 		.num_resources = ARRAY_SIZE(mt6357_keys_resources),
 		.resources = mt6357_keys_resources,
@@ -359,6 +367,9 @@ static const struct mfd_cell mt6357_devs[] = {
 	}, {
 		.name = "mtk-clock-buffer",
 		.of_compatible = "mediatek,clock_buffer",
+	}, {
+		.name = "mt6357-pulse-charger",
+		.of_compatible = "mediatek,mt6357-pulse-charger"
 	}
 };
 

@@ -614,22 +614,22 @@ static int primary_show_basic_debug_info(struct disp_frame_cfg_t *cfg)
 
 	dprec_logger_get_result_value(DPREC_LOGGER_RDMA0_TRANSFER_1SECOND,
 				      &fps);
-	scnprintf(disp_tmp, sizeof(disp_tmp), ",rdma_fps:%lld.%02lld,",
+	snprintf(disp_tmp, sizeof(disp_tmp), ",rdma_fps:%lld.%02lld,",
 		 fps.fps, fps.fps_low);
 	screen_logger_add_message("rdma_fps", MESSAGE_REPLACE, disp_tmp);
 
 	dprec_logger_get_result_value(DPREC_LOGGER_OVL_FRAME_COMPLETE_1SECOND,
 				      &fps);
-	scnprintf(disp_tmp, sizeof(disp_tmp), "ovl_fps:%lld.%02lld,",
+	snprintf(disp_tmp, sizeof(disp_tmp), "ovl_fps:%lld.%02lld,",
 		 fps.fps, fps.fps_low);
 	screen_logger_add_message("ovl_fps", MESSAGE_REPLACE, disp_tmp);
 
 	dprec_logger_get_result_value(DPREC_LOGGER_PQ_TRIGGER_1SECOND, &fps);
-	scnprintf(disp_tmp, sizeof(disp_tmp), "PQ_trigger:%lld.%02lld,",
+	snprintf(disp_tmp, sizeof(disp_tmp), "PQ_trigger:%lld.%02lld,",
 		 fps.fps, fps.fps_low);
 	screen_logger_add_message("PQ trigger", MESSAGE_REPLACE, disp_tmp);
 
-	scnprintf(disp_tmp, sizeof(disp_tmp), primary_display_is_video_mode() ?
+	snprintf(disp_tmp, sizeof(disp_tmp), primary_display_is_video_mode() ?
 		 "vdo," : "cmd,");
 	screen_logger_add_message("mode", MESSAGE_REPLACE, disp_tmp);
 
@@ -3554,11 +3554,13 @@ static int _ovl_fence_release_callback(unsigned long userdata)
 		cmdqBackupReadSlot(pgc->ovl_config_time, 0, &time_event);
 		cmdqBackupReadSlot(pgc->ovl_config_time, 1, &time_event1);
 		cmdqBackupReadSlot(pgc->ovl_config_time, 2, &time_event2);
-		n = scnprintf(msg, len,
-			"ovl config time_event %d time_event1 %d time_event2 %d time1_diff %d time2_diff %d\n",
-			time_event, time_event1, time_event2,
-			time_event1 - time_event,
-			time_event2 - time_event1);
+		n = snprintf(msg, len, "ovl config time_event %d ", time_event);
+		n += snprintf(msg + n, len - n, "time_event1 %d ", time_event1);
+		n += snprintf(msg + n, len - n, "time_event2 %d ", time_event2);
+		n += snprintf(msg + n, len - n, "time1_diff %d ",
+			      time_event1 - time_event);
+		n += snprintf(msg + n, len - n, "time2_diff %d\n",
+			      time_event2 - time_event1);
 		DISPMSG("%s", msg);
 #endif
 
@@ -4156,27 +4158,34 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps,
 				   lcm_param->corner_pattern_lt_addr,
 				   lcm_param->corner_pattern_tp_size);
 
-			rc_va_addr = vmalloc(lcm_param->corner_pattern_tp_size);
-			if (!rc_va_addr)
-				DISP_PR_ERR("[RC]: vmalloc failed! line\n");
-
-			memcpy(rc_va_addr,
-				lcm_param->corner_pattern_lt_addr,
-				lcm_param->corner_pattern_tp_size);
-
 			ion_handle = disp_ion_alloc(ion_client,
-				ION_HEAP_MULTIMEDIA_MAP_MVA_MASK,
-				(unsigned long)rc_va_addr,
+				ION_HEAP_MULTIMEDIA_MASK,
+				0,
 				lcm_param->corner_pattern_tp_size);
 
-			if (!ion_handle)
-				DISP_PR_ERR("allocate buffer fail\n");
+			if (!ion_handle) {
+				_DISP_PRINT_FENCE_OR_ERR(1,
+					"allocate RC buffer fail\n");
+				ret = 1;
+				goto lcm_corner_out;
+			}
+
+			rc_va_addr = ion_map_kernel(ion_client, ion_handle);
+			if (IS_ERR(rc_va_addr))
+				_DISP_PRINT_FENCE_OR_ERR(1,
+					"[RC]: vmalloc failed! line\n");
+			else
+				memcpy(rc_va_addr,
+					lcm_param->corner_pattern_lt_addr,
+					lcm_param->corner_pattern_tp_size);
+
+			ion_unmap_kernel(ion_client, ion_handle);
 
 			disp_ion_get_mva(ion_client, ion_handle,
 				&top_mva, DISP_M4U_PORT_DISP_POSTMASK);
 			disp_ion_cache_flush(ion_client, ion_handle,
 				ION_CACHE_INVALID_BY_RANGE);
-
+lcm_corner_out:
 			if (ret)
 				DISP_PR_ERR("[RC]:Fail to cach sync\n");
 		}
@@ -4727,17 +4736,17 @@ int primary_display_release_fence_fake(void)
 		disp_sync_get_cached_layer_info(session, i,
 				&layer_en, (unsigned long *)&addr, &fence_idx);
 		if (fence_idx == -1) {
-			n = scnprintf(msg, len, "find fence for layer %d,", i);
-			n += scnprintf(msg + n, len - n, "addr 0x%08x fail, ",
+			n = snprintf(msg, len, "find fence for layer %d,", i);
+			n += snprintf(msg + n, len - n, "addr 0x%08x fail, ",
 				      addr);
-			n += scnprintf(msg + n, len - n, "unregistered\n");
+			n += snprintf(msg + n, len - n, "unregistered\n");
 			DISP_PR_INFO("%s", msg);
 		} else if (fence_idx < 0) {
-			n = scnprintf(msg, len, "find fence idx for layer %d,",
+			n = snprintf(msg, len, "find fence idx for layer %d,",
 				     i);
-			n += scnprintf(msg + n, len - n, "addr 0x%08x fail, ",
+			n += snprintf(msg + n, len - n, "addr 0x%08x fail, ",
 				      addr);
-			n += scnprintf(msg + n, len - n, "unknown\n");
+			n += snprintf(msg + n, len - n, "unknown\n");
 			DISP_PR_INFO("%s", msg);
 		} else {
 			if (layer_en)
@@ -5098,9 +5107,6 @@ static int check_switch_lcm_mode_for_debug(void)
 	lcm_param_cv = disp_lcm_get_params(pgc->plcm);
 	DISPCHECK("lcm_mode_status=%d, lcm_param_cv->dsi.mode %d\n",
 		  lcm_mode_status, lcm_param_cv->dsi.mode);
-	if (unlikely(!lcm_param_cv))
-		return 0;
-
 	if (lcm_param_cv->dsi.mode != CMD_MODE)
 		vdo_mode_type = lcm_param_cv->dsi.mode;
 
@@ -5261,9 +5267,6 @@ int primary_display_resume(void)
 		mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 				 MMPROFILE_FLAG_PULSE, 1, 2);
 		lcm_param = disp_lcm_get_params(pgc->plcm);
-
-		if (unlikely(!lcm_param))
-			return DISP_STATUS_ERROR;
 
 		data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
 		memcpy(&(data_config->dispif_config), lcm_param,
@@ -5567,13 +5570,6 @@ int primary_display_aod_backlight(int level)
 		mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 				MMPROFILE_FLAG_PULSE, 1, 2);
 		lcm_param = disp_lcm_get_params(pgc->plcm);
-		if (unlikely(!lcm_param)) {
-			_DISP_PRINT_FENCE_OR_ERR(1,
-				"%s #%d lcm_param NULL\n",
-				__func__, __LINE__);
-			__pm_relax(pri_wk_lock);
-			return DISP_STATUS_ERROR;
-		}
 
 		data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
 		memcpy(&(data_config->dispif_config), lcm_param,
@@ -6885,7 +6881,7 @@ static int _config_ovl_input(struct disp_frame_cfg_t *cfg,
 		if (disp_helper_get_option(DISP_OPT_SHOW_VISUAL_DEBUG_INFO)) {
 			char msg[10];
 
-			scnprintf(msg, sizeof(msg), "HRT=%d,", hrt_level);
+			snprintf(msg, sizeof(msg), "HRT=%d,", hrt_level);
 			screen_logger_add_message("HRT", MESSAGE_REPLACE, msg);
 		}
 	}
@@ -7060,6 +7056,14 @@ static int _config_ovl_input(struct disp_frame_cfg_t *cfg,
 		}
 	}
 
+	if (primary_display_is_video_mode() &&
+	    !primary_display_is_decouple_mode()) {
+		unsigned long ovl_base = ovl_base_addr(DISP_MODULE_OVL0_2L);
+
+		cmdqRecBackupRegisterToSlot(cmdq_handle, pgc->ovl_status_info,
+			0, disp_addr_convert(DISP_REG_OVL_STA + ovl_base));
+	}
+
 done:
 #ifdef DEBUG_OVL_CONFIG_TIME
 	cmdqRecBackupRegisterToSlot(cmdq_handle, pgc->ovl_config_time,
@@ -7132,7 +7136,7 @@ static int primary_frame_cfg_input(struct disp_frame_cfg_t *cfg)
 			}
 		}
 		if (all_zero)
-			DISP_PR_INFO("HWC set zero matrix\n");
+			disp_aee_print("HWC set zero matrix\n");
 		else if (!primary_display_is_decouple_mode()) {
 			disp_ccorr_set_color_matrix(cmdq_handle,
 				m_ccorr_config.color_matrix,
@@ -8511,9 +8515,6 @@ int primary_display_ccci_mipi_callback(int en, unsigned int usrdata)
 		return 0;
 
 	lcm_param = disp_lcm_get_params(pgc->plcm);
-	if (unlikely(!lcm_param))
-		return 0;
-
 	if (lcm_param->dsi.dynamic_switch_mipi == 0)
 		return 0;
 
@@ -8797,17 +8798,16 @@ static int _screen_cap_by_cpu(unsigned int mva, enum UNIFIED_COLOR_FMT ufmt,
 #endif
 
 int primary_display_capture_framebuffer_ovl(unsigned long pbuf,
+					    unsigned int buf_sz,
 					    enum UNIFIED_COLOR_FMT ufmt)
 {
 	int ret = 0;
 	struct ion_client *ion_display_client = NULL;
 	struct ion_handle *ion_display_handle = NULL;
 	unsigned int mva = 0;
-	unsigned int w_xres = primary_display_get_width();
-	unsigned int h_yres = primary_display_get_height();
-	unsigned int pixel_byte = primary_display_get_bpp() / 8;
-	int buffer_size = h_yres * w_xres * pixel_byte;
+	int buffer_size = buf_sz;
 	enum DISP_MODULE_ENUM after_eng = DISP_MODULE_OVL0;
+	void *frame_va = NULL;
 #if defined(CONFIG_MTK_ION)
 	int tmp;
 #endif
@@ -8831,8 +8831,8 @@ int primary_display_capture_framebuffer_ovl(unsigned long pbuf,
 	}
 
 	ion_display_handle = disp_ion_alloc(ion_display_client,
-					    ION_HEAP_MULTIMEDIA_MAP_MVA_MASK,
-					    pbuf, buffer_size);
+					    ION_HEAP_MULTIMEDIA_MASK,
+					    0, buffer_size);
 	if (!ion_display_handle) {
 		DISPMSG("primary capture:Fail to allocate buffer\n");
 		ret = -1;
@@ -8857,6 +8857,15 @@ int primary_display_capture_framebuffer_ovl(unsigned long pbuf,
 
 	disp_ion_cache_flush(ion_display_client, ion_display_handle,
 			     ION_CACHE_INVALID_BY_RANGE);
+
+	frame_va = ion_map_kernel(ion_display_client, ion_display_handle);
+	if (IS_ERR(frame_va)) {
+		_DISP_PRINT_FENCE_OR_ERR(1, "%s #%d map err:%lx\n",
+					 (unsigned long)frame_va);
+		goto out;
+	}
+	memcpy(pbuf, frame_va, buffer_size);
+	ion_unmap_kernel(ion_display_client, ion_display_handle);
 
 out:
 	if (ion_display_client)
@@ -8892,22 +8901,22 @@ int primary_display_capture_framebuffer(unsigned long pbuf)
 	char msg[len];
 	int n = 0;
 
-	n = scnprintf(msg, len, "w_res=%d, h_yres=%d, pixel_bpp=%d, w_fb=%d, ",
+	n = snprintf(msg, len, "w_res=%d, h_yres=%d, pixel_bpp=%d, w_fb=%d, ",
 		     w_xres, h_yres, Bpp, w_fb);
-	n += scnprintf(msg + n, len - n, "fbsize=%d, fbaddress=0x%lx\n",
+	n += snprintf(msg + n, len - n, "fbsize=%d, fbaddress=0x%lx\n",
 		      fbsize, fbaddress);
 	DISPMSG("%s", msg);
 
 	fbv = ioremap(fbaddress, fbsize);
-	n = scnprintf(msg, len, "w_xres=%d, h_yres=%d, w_fb=%d, pixel_bpp=%d, ",
+	n = snprintf(msg, len, "w_xres=%d, h_yres=%d, w_fb=%d, pixel_bpp=%d, ",
 		     w_xres, h_yres, w_fb, Bpp);
-	n += scnprintf(msg + n, len - n, "fbsize=%d, fbaddress = 0x%08lx\n",
+	n += snprintf(msg + n, len - n, "fbsize=%d, fbaddress = 0x%08lx\n",
 		      fbsize, fbaddress);
 	DISPMSG("%s", msg);
 	if (!fbv) {
-		n = scnprintf(msg, len, "[FB Driver], Unable to allocate ");
-		n += scnprintf(msg + n, len - n, "memory for frame buffer: ");
-		n += scnprintf(msg + n, len - n, "address=0x%lx, size=0x%08x\n",
+		n = snprintf(msg, len, "[FB Driver], Unable to allocate ");
+		n += snprintf(msg + n, len - n, "memory for frame buffer: ");
+		n += snprintf(msg + n, len - n, "address=0x%lx, size=0x%08x\n",
 			      fbaddress, fbsize);
 		DISPMSG("%s", msg);
 		return -1;
@@ -9475,9 +9484,6 @@ int primary_display_resolution_test(void)
 		DISPCHECK("%s:width %d, heigh %d\n",
 			  __func__, dst_width, dst_heigh);
 		lcm_param2 = disp_lcm_get_params(pgc->plcm);
-		if (unlikely(!lcm_param2))
-			return ret;
-
 		lcm_param2->dsi.mode = CMD_MODE;
 		lcm_param2->dsi.horizontal_active_pixel = dst_width;
 		lcm_param2->dsi.vertical_active_line = dst_heigh;
@@ -9517,8 +9523,11 @@ int primary_display_resolution_test(void)
 			char msg[len];
 			int n = 0;
 
-			n = scnprintf(msg, len,
-				"[display_test]=>Fatal error, we didn't trigger display path but it's already busy\n");
+			n = snprintf(msg, len, "[display_test]=>Fatal error, ");
+			n += snprintf(msg + n, len - n,
+				      "we didn't trigger display path ");
+			n += snprintf(msg + n, len - n,
+				      "but it's already busy\n");
 			DISP_PR_ERR("%s", msg);
 		}
 
@@ -9543,8 +9552,6 @@ int primary_display_resolution_test(void)
 	}
 	dpmgr_path_stop(pgc->dpmgr_handle, CMDQ_DISABLE);
 	lcm_param2 = disp_lcm_get_params(pgc->plcm);
-	if (unlikely(!lcm_param2))
-		return ret;
 	lcm_param2->dsi.mode = dsi_mode_backup;
 	lcm_param2->dsi.vertical_active_line = h_backup;
 	lcm_param2->dsi.horizontal_active_pixel = w_backup;
@@ -9617,10 +9624,10 @@ int primary_display_check_test(void)
 		char msg[len];
 		int n = 0;
 
-		n = scnprintf(msg, len, "[display_test]=>Fatal error, ");
-		n += scnprintf(msg + n, len - n,
+		n = snprintf(msg, len, "[display_test]=>Fatal error, ");
+		n += snprintf(msg + n, len - n,
 			      "we didn't trigger display path ");
-		n += scnprintf(msg + n, len - n,
+		n += snprintf(msg + n, len - n,
 			      "but it's already busy\n");
 		DISP_PR_ERR("%s", msg);
 	}

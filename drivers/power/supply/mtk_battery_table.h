@@ -32,7 +32,13 @@
 /* enable that uisoc = 1 and wait xmins then shutdown */
 #define SHUTDOWN_GAUGE1_XMINS	1
 /* define Xmins to shutdown*/
+//+bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
+#ifdef CONFIG_MT6370_PMU_CHARGER
+#define SHUTDOWN_1_TIME			6
+#else
 #define SHUTDOWN_1_TIME			5
+#endif
+//-bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
 
 #define SHUTDOWN_GAUGE1_VBAT_EN	0
 #define SHUTDOWN_GAUGE1_VBAT	34000
@@ -67,7 +73,13 @@
 #define QMAX_SEL				1
 #define IBOOT_SEL				0
 #define SHUTDOWN_SYSTEM_IBOOT	15000	/* 0.1mA */
+//+bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
+#ifdef CONFIG_MT6370_PMU_CHARGER
+#define PMIC_MIN_VOL			34000
+#else
 #define PMIC_MIN_VOL			33500
+#endif
+//-bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
 
 /*ui_soc related */
 #define DIFFERENCE_FULL_CV		1000 /*0.01%*/
@@ -254,9 +266,6 @@
 #define UI_LOW_LIMIT_VTH4	34500
 #define UI_LOW_LIMIT_TIME	99999
 
-#define MOVING_BATTEMP_EN	1
-#define MOVING_BATTEMP_THR	20
-
 /* Qmax for battery  */
 #define Q_MAX_L_CURRENT		0
 #define Q_MAX_H_CURRENT		10000
@@ -370,8 +379,15 @@ int g_PMIC_MIN_VOL[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 	{33500, 33500, 33500, 33500},/*T0*/
 	{33500, 33500, 33500, 33500},/*T1*/
 	{33500, 33500, 33500, 33500},/*T2*/
+//+bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
+#ifdef CONFIG_MT6370_PMU_CHARGER
+	{33500, 33500, 33500, 33500},/*T3*/
+	{33000, 33000, 33000, 33000},/*T4*/
+#else
 	{32200, 32200, 32200, 32200},/*T3*/
 	{31000, 31000, 31000, 31000},/*T4*/
+#endif
+//-bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
 	{33001, 33006, 33009, 33004},/*T5*/
 	{33002, 33007, 33008, 33003},/*T6*/
 	{33003, 33008, 33007, 33002},/*T7*/
@@ -400,8 +416,15 @@ int g_QMAX_SYS_VOL[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 	{33500, 33500, 33500, 33500},/*T0*/
 	{33500, 33500, 33500, 33500},/*T1*/
 	{33500, 33500, 33500, 33500},/*T2*/
+//+bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
+#ifdef CONFIG_MT6370_PMU_CHARGER
+	{34500, 34500, 34500, 34500},/*T3*/
+	{33700, 33700, 33700, 33700},/*T4*/
+#else
 	{32900, 32900, 32900, 32900},/*T3*/
 	{32800, 32800, 32800, 32800},/*T4*/
+#endif
+//-bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
 	{33500, 33500, 33500, 33500},/*T5*/
 	{33500, 33500, 33500, 33500},/*T6*/
 	{33500, 33500, 33500, 33500},/*T7*/
@@ -431,7 +454,7 @@ int g_temperature[MAX_TABLE] = {
 #define BAT_NTC_47 0
 
 #if (BAT_NTC_10 == 1)
-#define RBAT_PULL_UP_R             24000
+#define RBAT_PULL_UP_R             16900
 #endif
 
 #if (BAT_NTC_47 == 1)
@@ -443,31 +466,34 @@ int g_temperature[MAX_TABLE] = {
 #define BIF_NTC_R 16000
 
 #if (BAT_NTC_10 == 1)
-struct fuelgauge_temperature Fg_Temperature_Table[21] = {
-		{-40, 195652},
-		{-35, 148171},
-		{-30, 113347},
-		{-25, 87559},
-		{-20, 68237},
-		{-15, 53650},
-		{-10, 42506},
-		{-5, 33892},
-		{0, 27219},
-		{5, 22021},
-		{10, 17926},
-		{15, 14674},
-		{20, 12081},
+//+Bug612420,xuejizhou.wt,MODIFY,20201222,SW JEITA configuration
+struct fuelgauge_temperature Fg_Temperature_Table[23] = {
+		{-40, 205200},
+		{-35, 154800},
+		{-30, 117900},
+		{-25, 90690},
+		{-20, 70370},
+		{-15, 55070},
+		{-10, 43440},
+		{-5, 34530},
+		{0, 27640},
+		{5, 22270},
+		{10, 18060},
+		{15, 14740},
+		{20, 12110},
 		{25, 10000},
-		{30, 8315},
-		{35, 6948},
-		{40, 5834},
-		{45, 4917},
-		{50, 4161},
-		{55, 3535},
-		{60, 3014}
+		{30, 8309},
+		{35, 6941},
+		{40, 5828},
+		{45, 4916},
+		{50, 4165},
+		{55, 3543},
+		{60, 3027},
+		{65, 2595},
+		{70, 2233}
 };
 #endif
-
+//+Bug612420,xuejizhou.wt,MODIFY,20201222,SW JEITA configuration
 #if (BAT_NTC_47 == 1)
 struct fuelgauge_temperature Fg_Temperature_Table[21] = {
 		{-40, 1747920},

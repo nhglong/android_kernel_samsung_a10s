@@ -152,7 +152,7 @@ static int _pd_is_algo_ready(struct chg_alg_device *alg)
 		if (ret_value == ALG_READY) {
 			uisoc = pd_hal_get_uisoc(alg);
 			if (pd->input_current_limit1 != -1 ||
-				pd->charging_current_limit1 != -1 ||
+//				pd->charging_current_limit1 != -1 ||
 				pd->input_current_limit2 != -1 ||
 				pd->charging_current_limit2 != -1 ||
 				uisoc >= pd->pd_stop_battery_soc)
@@ -160,7 +160,10 @@ static int _pd_is_algo_ready(struct chg_alg_device *alg)
 		} else if (ret_value == ALG_TA_NOT_SUPPORT)
 			pd->state = PD_TA_NOT_SUPPORT;
 		else if (ret_value == ALG_TA_CHECKING)
+		{
 			pd->state = PD_HW_READY;
+			ret_value = ALG_TA_NOT_SUPPORT;
+		}
 		else
 			pd->state = PD_TA_NOT_SUPPORT;
 
@@ -661,10 +664,13 @@ static int pd_sc_set_charger(struct chg_alg_device *alg)
 			pd->sc_charger_current)
 			pd->charging_current1 =
 				pd->charging_current_limit1;
+		else
+			pd->charging_current1 =
+				pd->sc_charger_current;
 		ret = pd_hal_get_min_charging_current(alg, CHG1, &ichg1_min);
 		if (ret != -ENOTSUPP &&
 			pd->charging_current_limit1 < ichg1_min)
-			pd->charging_current1 = 0;
+			pd->charging_current1 = ichg1_min;
 	} else
 		pd->charging_current1 = pd->sc_charger_current;
 
@@ -675,7 +681,7 @@ static int pd_sc_set_charger(struct chg_alg_device *alg)
 		ret = pd_hal_get_min_input_current(alg, CHG1, &aicr1_min);
 		if (ret != -ENOTSUPP &&
 			pd->input_current_limit1 < aicr1_min)
-			pd->input_current1 = 0;
+			pd->input_current1 = aicr1_min;
 	} else
 		pd->input_current1 = pd->sc_input_current;
 	mutex_unlock(&pd->data_lock);
@@ -892,7 +898,7 @@ static int _pd_start_algo(struct chg_alg_device *alg)
 			else if (ret_value == ALG_READY) {
 				uisoc = pd_hal_get_uisoc(alg);
 				if (pd->input_current_limit1 != -1 ||
-					pd->charging_current_limit1 != -1 ||
+//					pd->charging_current_limit1 != -1 ||
 					pd->input_current_limit2 != -1 ||
 					pd->charging_current_limit2 != -1 ||
 					uisoc >= pd->pd_stop_battery_soc)

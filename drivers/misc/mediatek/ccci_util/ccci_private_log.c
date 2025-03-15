@@ -17,8 +17,12 @@
 #include <linux/ktime.h>
 #include <linux/delay.h>
 #include <linux/vmalloc.h>
+#include <linux/of.h>
+#include <linux/of_fdt.h>
+#include <linux/of_reserved_mem.h>
 #include "mt-plat/mtk_ccci_common.h"
 #include <linux/rtc.h>
+#include <memory-amms.h>
 #include "ccci_util_log.h"
 
 /******************************************************************************/
@@ -804,6 +808,15 @@ static const struct file_operations ccci_dump_fops = {
 	.poll = ccci_dump_poll,
 };
 
+phys_addr_t cccimdee_reserved_phy_addr;
+void *cccimdee_reserved_vir_addr;
+unsigned int cccimdee_reserved_size;
+static void *cccimdee_reserve_memory_alloc(unsigned int zone,
+	unsigned int id, unsigned int size);
+
+static void *cccimdee_reserve_memory_alloc(unsigned int zone,
+	unsigned int id, unsigned int size);
+
 static void ccci_dump_buffer_init(void)
 {
 	int i = 0;
@@ -811,11 +824,24 @@ static void ccci_dump_buffer_init(void)
 	struct proc_dir_entry *ccci_dump_proc;
 	struct buffer_node *node_ptr;
 	struct ccci_dump_buffer *ptr;
+	pgprot_t prot;
 
 	ccci_dump_proc = proc_create("ccci_dump", 0440, NULL, &ccci_dump_fops);
 	if (ccci_dump_proc == NULL) {
 		pr_notice("[ccci0/util]fail to create proc entry for dump\n");
 		return;
+	}
+
+	cccimdee_reserved_phy_addr &= PAGE_MASK;
+	if (!pfn_valid(__phys_to_pfn(cccimdee_reserved_phy_addr)))
+		cccimdee_reserved_vir_addr =
+			ioremap_wc(cccimdee_reserved_phy_addr,
+				cccimdee_reserved_size);
+	else {
+		prot = pgprot_writecombine(PAGE_KERNEL);
+		cccimdee_reserved_vir_addr =
+			vmap_reserved_mem(cccimdee_reserved_phy_addr,
+				cccimdee_reserved_size, prot);
 	}
 
 	spin_lock_init(&file_lock);
@@ -849,13 +875,21 @@ static void ccci_dump_buffer_init(void)
 
 	for (i = 0; i < 2; i++) {
 		node_ptr = &node_array[i][0];
+		j = 0;
 		while (node_ptr->ctlb_ptr != NULL) {
 			ptr = node_ptr->ctlb_ptr;
 			spin_lock_init(&ptr->lock);
 			if (buff_en_bit_map & (1<<i) && node_ptr->init_size) {
-				/* allocate buffer */
-				ptr->buffer = kmalloc(node_ptr->init_size,
+				ptr->buffer = cccimdee_reserve_memory_alloc(i,
+					j, node_ptr->init_size);
+				if (ptr->buffer == NULL) {
+					/* allocate buffer */
+					ptr->buffer =
+						kmalloc(node_ptr->init_size,
 						GFP_KERNEL);
+					pr_notice("[ccci]alloc ee dump memory:zone %d,id:%d, size:0x%x\n",
+						i, j, node_ptr->init_size);
+				}
 				if (ptr->buffer != NULL) {
 					ptr->buf_size = node_ptr->init_size;
 					ptr->attr = node_ptr->init_attr;
@@ -864,6 +898,7 @@ static void ccci_dump_buffer_init(void)
 						node_ptr->index);
 			}
 			node_ptr++;
+			j++;
 		}
 	}
 }
@@ -1204,3 +1239,43 @@ void get_md_aee_buffer(unsigned long *vaddr, unsigned long *size)
 
 }
 EXPORT_SYMBOL(get_md_aee_buffer);
+unsigned long long cccimdee_reserved_phy_addr;
+static int cccimdee_reserve_memory_init(struct reserved_mem *rmem)
+{
+	cccimdee_reserved_phy_addr = rmem->base;
+	pr_notice("[memblock]%s: 0x%llx - 0x%llx (0x%llx), virt:0x%llx\n",
+		"ccci-md-ee-dump", (unsigned long long)rmem->base,
+		(unsigned long long)rmem->base + (unsigned long long)rmem->size,
+		(unsigned long long)rmem->size,
+		(unsigned long long)phys_to_virt(rmem->base));
+	return 0;
+}
+
+static void *cccimdee_reserve_memory_alloc(unsigned int zone,
+	unsigned int id, unsigned int size)
+{
+	void *virt = NULL;
+	static unsigned int total_size;
+
+	total_size += size;
+	if (total_size > cccimdee_reserved_size) {
+		pr_notice("[ccci]err:alloc total_size(0x%x) > cccimdee_reserved_size(0x%x)\n",
+			total_size, cccimdee_reserved_size);
+		return NULL;
+	}
+
+	virt = cccimdee_reserved_vir_addr;
+	pr_notice("[ccci]alloc ee dump DT reserve memory:zone %d,id:%d, size:0x%x, virt:0x%p, phy:0x%llx\n",
+		zone, id, size, virt,
+		cccimdee_reserved_phy_addr);
+
+	cccimdee_reserved_vir_addr += size;
+	cccimdee_reserved_phy_addr += size;
+
+
+	return virt;
+}
+
+RESERVEDMEM_OF_DECLARE(reserve_memory_cccimdeedump, "mediatek,ccci-md-ee-dump",
+	cccimdee_reserve_memory_init);
+

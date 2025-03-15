@@ -14,12 +14,13 @@
 
 
 #define IMGSENSOR_HW_POWER_INFO_MAX	12
-#define IMGSENSOR_HW_SENSOR_MAX_NUM	8
+#define IMGSENSOR_HW_SENSOR_MAX_NUM	23//bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
 
 enum IMGSENSOR_HW_PIN {
 	IMGSENSOR_HW_PIN_NONE = 0,
 	IMGSENSOR_HW_PIN_PDN,
 	IMGSENSOR_HW_PIN_RST,
+	IMGSENSOR_HW_PIN_AF_EN,//bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
 	IMGSENSOR_HW_PIN_AVDD,
 	IMGSENSOR_HW_PIN_DVDD,
 	IMGSENSOR_HW_PIN_DOVDD,
@@ -57,6 +58,7 @@ enum IMGSENSOR_HW_PIN_STATE {
 #define	DVDD   IMGSENSOR_HW_PIN_DVDD
 #define	DOVDD  IMGSENSOR_HW_PIN_DOVDD
 #define	AFVDD  IMGSENSOR_HW_PIN_AFVDD
+#define	AFVDD_EN  IMGSENSOR_HW_PIN_AF_EN//bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
 #define	VDD_None  IMGSENSOR_HW_PIN_NONE
 
 	/* For backward compatible */
@@ -89,15 +91,21 @@ enum IMGSENSOR_HW_ID {
 #define IMGSENSOR_I2C_DRV_NAME_0  "kd_camera_hw"
 #define IMGSENSOR_I2C_DRV_NAME_1  "kd_camera_hw_bus2"
 #define IMGSENSOR_I2C_DRV_NAME_2  "kd_camera_hw_bus3"
+#define IMGSENSOR_I2C_DRV_NAME_3  "kd_camera_hw_bus4"
+#define IMGSENSOR_I2C_DRV_NAME_4  "kd_camera_hw_bus5"
 
 #define IMGSENSOR_I2C_OF_DRV_NAME_0 "mediatek,camera_main"
 #define IMGSENSOR_I2C_OF_DRV_NAME_1 "mediatek,camera_sub"
 #define IMGSENSOR_I2C_OF_DRV_NAME_2 "mediatek,camera_main_two"
+#define IMGSENSOR_I2C_OF_DRV_NAME_3 "mediatek,camera_sub_two"
+#define IMGSENSOR_I2C_OF_DRV_NAME_4 "mediatek,camera_main_three"
 
 enum IMGSENSOR_I2C_DEV {
 	IMGSENSOR_I2C_DEV_0,
 	IMGSENSOR_I2C_DEV_1,
 	IMGSENSOR_I2C_DEV_2,
+	IMGSENSOR_I2C_DEV_3,
+	IMGSENSOR_I2C_DEV_4,
 	IMGSENSOR_I2C_DEV_MAX_NUM,
 };
 

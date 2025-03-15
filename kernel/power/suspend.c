@@ -33,6 +33,7 @@
 #include <linux/compiler.h>
 #include <linux/moduleparam.h>
 #include <linux/wakeup_reason.h>
+#include <linux/rtc.h>
 
 #include "power.h"
 
@@ -681,7 +682,19 @@ static int enter_state(suspend_state_t state)
 	mutex_unlock(&system_transition_mutex);
 	return error;
 }
+//+Chk80259, madongyu.wt, add, 20210223, add kernel debug log
+static void pm_suspend_marker(char *annotation)
+{
+     struct timespec ts;
+     struct rtc_time tm;
 
+     getnstimeofday(&ts);
+     rtc_time_to_tm(ts.tv_sec, &tm);
+     pr_info("PM: suspend %s %d-%02d-%02d %02d:%02d:%02d.%09lu UTC\n",
+            annotation, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+            tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
+}
+//-Chk80259, madongyu.wt, add, 20210223, add kernel debug log
 /**
  * pm_suspend - Externally visible function for suspending the system.
  * @state: System sleep state to enter.
@@ -695,7 +708,8 @@ int pm_suspend(suspend_state_t state)
 
 	if (state <= PM_SUSPEND_ON || state >= PM_SUSPEND_MAX)
 		return -EINVAL;
-
+    //Chk80259, madongyu.wt, add, 20210223, add kernel debug log
+    pm_suspend_marker("enter");
 	pr_info("suspend entry (%s)\n", mem_sleep_labels[state]);
 	error = enter_state(state);
 	if (error) {
@@ -705,6 +719,8 @@ int pm_suspend(suspend_state_t state)
 		suspend_stats.success++;
 	}
 	pr_info("suspend exit\n");
+    //Chk80259, madongyu.wt, add, 20210223, add kernel debug log
+    pm_suspend_marker("exit");
 	return error;
 }
 EXPORT_SYMBOL(pm_suspend);

@@ -28,23 +28,17 @@ struct mtk_spi {
 	const struct mtk_spi_compatible *dev_comp;
 };
 
-int secspi_enable_clk(struct spi_device *spidev)
+void secspi_enable_clk(struct spi_device *spidev)
 {
 	struct spi_master *master;
 	struct mtk_spi *ms;
-	int ret = 0;
 
 	master = spidev->master;
 	ms = spi_master_get_devdata(master);
-	ret = clk_prepare_enable(ms->spi_clk);
-	if (ret)
-		return ret;
-	if (!IS_ERR(ms->spare_clk)) {
-		ret = clk_prepare_enable(ms->spare_clk);
-		if (ret)
-			return ret;
-	}
-	return 0;
+
+	clk_prepare_enable(ms->spi_clk);
+	if (!IS_ERR(ms->spare_clk))
+		clk_prepare_enable(ms->spare_clk);
 }
 
 void secspi_disable_clk(struct spi_device *spidev)
@@ -218,10 +212,8 @@ static ssize_t spi_store(struct device *dev,
 		}
 	}
 
-	if (!strncmp(buf, "enableclk", 9)) {
-		if (secspi_enable_clk(spi))
-			SPI_DEBUG("spi enable clk error.\n");
-	}
+	if (!strncmp(buf, "enableclk", 9))
+		secspi_enable_clk(spi);
 	if (!strncmp(buf, "disableclk", 10))
 		secspi_disable_clk(spi);
 
@@ -234,33 +226,19 @@ static struct device_attribute *spi_attribute[] = {
 	&dev_attr_spi,
 };
 
-static int spi_create_attribute(struct device *dev)
+static void spi_create_attribute(struct device *dev)
 {
 	int size, idx;
-	int res = 0;
 
 	size = ARRAY_SIZE(spi_attribute);
-	for (idx = 0; idx < size; idx++) {
-		res = device_create_file(dev, spi_attribute[idx]);
-		if (res)
-			goto err;
-	}
-	return 0;
-err:
 	for (idx = 0; idx < size; idx++)
-		device_remove_file(dev, spi_attribute[idx]);
-
-	return res;
+		device_create_file(dev, spi_attribute[idx]);
 }
 
 static int spi_mt65xx_dev_probe(struct spi_device *spi)
 {
-	int res = 0;
-
-	res = spi_create_attribute(&spi->dev);
-	if (res)
-		SPI_DEBUG("spi create attribute error.\n");
-	return res;
+	spi_create_attribute(&spi->dev);
+	return 0;
 }
 
 static int spi_mt65xx_dev_remove(struct spi_device *spi)

@@ -47,13 +47,15 @@ int display_bias_enable(void)
 
 	display_bias_regulator_init();
 
+//+bug621774, liuguohua.wt, modify, 20200120, lcd bring up
 	/* set voltage with min & max*/
-	ret = regulator_set_voltage(disp_bias_pos, 5400000, 5400000);
+	ret = regulator_set_voltage(disp_bias_pos, 5500000, 5500000);
 	if (ret < 0)
 		pr_info("set voltage disp_bias_pos fail, ret = %d\n", ret);
 	retval |= ret;
 
-	ret = regulator_set_voltage(disp_bias_neg, 5400000, 5400000);
+	ret = regulator_set_voltage(disp_bias_neg, 5500000, 5500000);
+//-bug621774, liuguohua.wt, modify, 20200120, lcd bring up
 	if (ret < 0)
 		pr_info("set voltage disp_bias_neg fail, ret = %d\n", ret);
 	retval |= ret;

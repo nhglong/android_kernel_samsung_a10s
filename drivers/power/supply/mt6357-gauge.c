@@ -18,6 +18,7 @@
 #include <net/sock.h>
 #include "mtk_battery.h"
 #include "mtk_gauge.h"
+#include <linux/hardware_info.h>	//bug 635700, yaocankun.wt,ADD,20210319, add BMS_GAUGE info in MMI 
 
 
 /* ============================================================ */
@@ -133,6 +134,10 @@
 #define PMIC_AUXADC_NAG_VBAT1_SEL_MASK			0x1
 #define PMIC_AUXADC_NAG_VBAT1_SEL_SHIFT			2
 
+#define PMIC_FG_ZCV_DET_TIME_ADDR                       0xd2e
+#define PMIC_FG_ZCV_DET_TIME_MASK                       0x3F
+#define PMIC_FG_ZCV_DET_TIME_SHIFT                      8
+
 #define PMIC_FG_ZCV_CAR_TH_15_00_ADDR			0xd38
 #define PMIC_FG_ZCV_CAR_TH_15_00_MASK			0xFFFF
 #define PMIC_FG_ZCV_CAR_TH_15_00_SHIFT			0
@@ -199,6 +204,7 @@
 //
 
 #define PMIC_RG_SYSTEM_INFO_CON0_ADDR 0xd9a
+#define PMIC_RG_SYSTEM_INFO_CON1_ADDR 0xd9c
 
 #define UNIT_FGCURRENT			(314331)
 /* mt6357 314.331 uA */
@@ -214,7 +220,7 @@
 /* 3600 * 1000 * 1000 / 157166 , for coulomb interrupt */
 #define DEFAULT_R_FG			(100)
 /* 5mm ohm */
-#define UNIT_FGCAR_ZCV			(85)
+#define UNIT_FGCAR_ZCV			(19646)
 /* CHARGE_LSB = 0.085 uAh */
 
 #define VOLTAGE_FULL_RANGES		1800
@@ -492,6 +498,9 @@ void set_rtc_spare_fg_value(struct mtk_gauge *gauge, u8 val)
 static int fgauge_set_info(struct mtk_gauge *gauge,
 	enum gauge_property ginfo, unsigned int value)
 {
+	int value_mask = 0;
+	int sign_bit = 0;
+	int reg_val = 0;
 
 	bm_debug("[%s]info:%d v:%d\n", __func__, ginfo, value);
 
@@ -531,6 +540,40 @@ static int fgauge_set_info(struct mtk_gauge *gauge,
 		PMIC_RG_SYSTEM_INFO_CON0_ADDR,
 		0x007f << 0x9,
 		value << 0x9);
+	} else if (ginfo == GAUGE_PROP_SHUTDOWN_CAR) {
+		if (value == -99999) {
+			/* write invalid */
+			regmap_update_bits(gauge->regmap,
+			PMIC_RG_SYSTEM_INFO_CON1_ADDR,
+			0x01FF << 0x7,
+			0x1FF << 0x7);
+
+			bm_err("[%s]: write invalid value to GAUGE_PROP_SHUTDOWN_CAR\n",
+			__func__);
+			return 0;
+		}
+		if (value < 0)
+			sign_bit = 1;
+
+		value_mask = abs(value);
+		value_mask = value_mask & 0x00ff;
+
+		regmap_update_bits(gauge->regmap,
+			PMIC_RG_SYSTEM_INFO_CON1_ADDR,
+			0x00FF << 0x7,
+			value_mask << 0x7);
+
+		regmap_update_bits(gauge->regmap,
+			PMIC_RG_SYSTEM_INFO_CON1_ADDR,
+			0x0001 << 0xf,
+			sign_bit << 0xf);
+
+		regmap_read(gauge->regmap,
+			PMIC_RG_SYSTEM_INFO_CON1_ADDR, &reg_val);
+
+		bm_err(
+		"[%s]: GAUGE_PROP_SHUTDOWN_CAR:%d,0x%x,sign:%d, 0x%x,0x%x\n",
+		__func__, value, value, sign_bit, value_mask, reg_val);
 	}
 	return 0;
 }
@@ -539,6 +582,8 @@ static int fgauge_get_info(struct mtk_gauge *gauge,
 	enum gauge_property ginfo, int *value)
 {
 	int reg_val = 0;
+	int sign_bit = 0;
+	int tmp_val = 0;
 
 	regmap_read(gauge->regmap, PMIC_RG_SYSTEM_INFO_CON0_ADDR, &reg_val);
 
@@ -562,6 +607,29 @@ static int fgauge_get_info(struct mtk_gauge *gauge,
 	else if (ginfo == GAUGE_PROP_CON0_SOC)
 		*value =
 		(reg_val & (0x007F << 0x9))	>> 0x9;
+	else if (ginfo == GAUGE_PROP_SHUTDOWN_CAR) {
+		regmap_read(gauge->regmap,
+			PMIC_RG_SYSTEM_INFO_CON1_ADDR, &reg_val);
+
+		sign_bit = (reg_val & (0x1 << 0xf))	>> 0xf;
+		tmp_val = (reg_val & (0xff << 0x7))	>> 0x7;
+
+		if (sign_bit == 1 && tmp_val == 0xff) {
+			bm_err("[%s]: GAUGE_PROP_SHUTDOWN_CAR: invalid, sign:%d value:%d,0x%x\n",
+			__func__, sign_bit, tmp_val, reg_val);
+			sign_bit = 0;
+			*value = 0;
+		} else if (sign_bit == 1) {
+			*value = 0 - tmp_val;
+			bm_err("[%s]:GAUGE_PROP_SHUTDOWN_CAR: sign:%d, tmp_val:%d\n",
+			__func__, sign_bit, tmp_val);
+		} else if (sign_bit == 0)
+			*value = tmp_val;
+
+		bm_err("[%s]:GAUGE_PROP_SHUTDOWN_CAR: sign:%d, tmp_val:%d\n",
+		__func__, sign_bit, tmp_val);
+	}
+
 
 	bm_debug("[%s]info:%d v:%d\n", __func__, ginfo, *value);
 
@@ -738,9 +806,12 @@ static void fgauge_set_zcv_intr_internal(
 	int fg_zcv_car_th)
 {
 	int fg_zcv_car_thr_h_reg, fg_zcv_car_thr_l_reg;
-	long long fg_zcv_car_th_reg = fg_zcv_car_th;
+	int slepp_cur_avg = gauge_dev->gm->fg_cust_data.sleep_current_avg;
+	long long fg_zcv_car_th_reg = 0;
 
-	fg_zcv_car_th_reg = (fg_zcv_car_th_reg * 100 * 1000);
+	fg_zcv_car_th = (fg_zcv_det_time + 1) * slepp_cur_avg / 60;
+	fg_zcv_car_th_reg = (long long)fg_zcv_car_th;
+	fg_zcv_car_th_reg = (fg_zcv_car_th_reg * 100 * 3600 * 1000);
 
 #if defined(__LP64__) || defined(_LP64)
 	do_div(fg_zcv_car_th_reg, UNIT_FGCAR_ZCV);
@@ -770,6 +841,12 @@ static void fgauge_set_zcv_intr_internal(
 	fg_zcv_car_thr_h_reg = (fg_zcv_car_th_reg & 0xffff0000) >> 16;
 	fg_zcv_car_thr_l_reg = fg_zcv_car_th_reg & 0x0000ffff;
 
+	regmap_update_bits(gauge_dev->regmap,
+		PMIC_FG_ZCV_DET_TIME_ADDR,
+		PMIC_FG_ZCV_DET_TIME_MASK <<
+		PMIC_FG_ZCV_DET_TIME_SHIFT,
+		fg_zcv_det_time <<
+		PMIC_FG_ZCV_DET_TIME_SHIFT);
 
 	regmap_update_bits(gauge_dev->regmap,
 		PMIC_FG_ZCV_CAR_TH_15_00_ADDR,
@@ -793,14 +870,11 @@ static void fgauge_set_zcv_intr_internal(
 int zcv_intr_threshold_set(struct mtk_gauge *gauge,
 	struct mtk_gauge_sysfs_field_info *attr, int zcv_avg_current)
 {
-	int fg_zcv_det_time;
-	int fg_zcv_car_th = 0;
+	int fg_zcv_det_time = gauge->gm->fg_cust_data.zcv_suspend_time;
+	int fg_zcv_car_th = zcv_avg_current;
 
-	fg_zcv_det_time = gauge->gm->fg_cust_data.zcv_suspend_time;
-	fg_zcv_car_th = (fg_zcv_det_time + 1) * 4 * zcv_avg_current / 60;
-
-	bm_debug("[%s] current:%d, fg_zcv_det_time:%d, fg_zcv_car_th:%d\n",
-		__func__, zcv_avg_current, fg_zcv_det_time, fg_zcv_car_th);
+	bm_debug("[%s] fg_zcv_det_time:%d, fg_zcv_car_th:%d\n",
+		__func__, fg_zcv_det_time, fg_zcv_car_th);
 
 	fgauge_set_zcv_intr_internal(
 		gauge, fg_zcv_det_time, fg_zcv_car_th);
@@ -1410,7 +1484,12 @@ int info_get(struct mtk_gauge *gauge,
 		*val = gauge->hw_status.vbat2_det_time;
 	else if (attr->prop == GAUGE_PROP_VBAT2_DETECT_COUNTER)
 		*val = gauge->hw_status.vbat2_det_counter;
-	else
+	else if (attr->prop == GAUGE_PROP_SHUTDOWN_CAR) {
+		fgauge_get_info(gauge, attr->prop, val);
+		ret = *val;
+		bm_err("[%s]GAUGE_PROP_SHUTDOWN_CAR ret:%d v:%d\n",
+			__func__, ret, *val);
+	} else
 		ret = fgauge_get_info(gauge, attr->prop, val);
 
 	return ret;
@@ -2618,7 +2697,7 @@ static struct mtk_gauge_sysfs_field_info mt6357_sysfs_field_tbl[] = {
 		GAUGE_PROP_VBAT_HT_INTR_THRESHOLD),
 	GAUGE_SYSFS_FIELD_WO(vbat_lt_set,
 		GAUGE_PROP_VBAT_LT_INTR_THRESHOLD),
-	GAUGE_SYSFS_FIELD_RW(rtc_ui_soc, rtc_ui_soc_set, rtc_ui_soc_get,
+	GAUGE_SYSFS_FIELD_RW(rtc_ui_soc_set, rtc_ui_soc_get,
 		GAUGE_PROP_RTC_UI_SOC),
 	GAUGE_SYSFS_FIELD_RO(ptim_battery_voltage_get,
 		GAUGE_PROP_PTIM_BATTERY_VOLTAGE),
@@ -2636,7 +2715,7 @@ static struct mtk_gauge_sysfs_field_info mt6357_sysfs_field_tbl[] = {
 		GAUGE_PROP_NAFG_CNT),
 	GAUGE_SYSFS_FIELD_RO(nafg_dltv_get,
 		GAUGE_PROP_NAFG_DLTV),
-	GAUGE_SYSFS_FIELD_RW(nafg_c_dltv, nafg_c_dltv_set, nafg_c_dltv_get,
+	GAUGE_SYSFS_FIELD_RW(nafg_c_dltv_set, nafg_c_dltv_get,
 		GAUGE_PROP_NAFG_C_DLTV),
 	GAUGE_SYSFS_FIELD_WO(nafg_en_set,
 		GAUGE_PROP_NAFG_EN),
@@ -2646,7 +2725,7 @@ static struct mtk_gauge_sysfs_field_info mt6357_sysfs_field_tbl[] = {
 		GAUGE_PROP_NAFG_VBAT),
 	GAUGE_SYSFS_FIELD_WO(reset_fg_rtc_set,
 		GAUGE_PROP_RESET_FG_RTC),
-	GAUGE_SYSFS_FIELD_RW(gauge_initialized, gauge_initialized_set, gauge_initialized_get,
+	GAUGE_SYSFS_FIELD_RW(gauge_initialized_set, gauge_initialized_get,
 		GAUGE_PROP_GAUGE_INITIALIZED),
 	GAUGE_SYSFS_FIELD_RO(average_current_get,
 		GAUGE_PROP_AVERAGE_CURRENT),
@@ -3136,12 +3215,19 @@ static int mt6357_gauge_probe(struct platform_device *pdev)
 	gauge->psy = power_supply_register(&pdev->dev, &gauge->psy_desc,
 			&gauge->psy_cfg);
 	mt6357_sysfs_create_group(gauge);
+	initial_set(gauge, 0, 0);
 	bat_create_netlink(pdev);
 	battery_init(pdev);
 	adc_cali_cdev_init(pdev);
 
 	bm_err("%s: done\n", __func__);
-
+	//bug 635700, yaocankun.wt,ADD,20210319, add BMS_GAUGE info in MMI
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+	hardwareinfo_set_prop(HARDWARE_BMS_GAUGE_INFO, "MT6357");
+#else
+//P210708-01489, lvyuanchuan.wt,ADD,20210713, add BMS_GAUGE info in MMI for N6R
+	hardwareinfo_set_prop(HARDWARE_BMS_GAUGE_INFO, "MT6357");
+#endif
 	return 0;
 }
 
@@ -3168,7 +3254,7 @@ static struct platform_driver mt6357_gauge_driver = {
 	.suspend = mt6357_gauge_suspend,
 	.resume = mt6357_gauge_resume,
 	.driver = {
-		.name = "mt6357_gauge",
+		.name = "mt6357-gauge",
 		.of_match_table = mt6357_gauge_of_match,
 		},
 };

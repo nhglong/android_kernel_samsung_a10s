@@ -29,6 +29,7 @@
 #include "inc/mt6370_pmu_charger.h"
 #include "inc/mt6370_pmu.h"
 #include <tcpm.h>
+#include <linux/hardware_info.h>
 
 #define MT6370_PMU_CHARGER_DRV_VERSION	"1.1.29_MTK"
 
@@ -136,6 +137,10 @@ struct mt6370_pmu_charger_data {
 	atomic_t bc12_cnt;
 	atomic_t bc12_wkard;
 	int tchg;
+	bool ignore_usb;
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+	bool hz_mode;
+#endif
 #ifdef CONFIG_TCPC_CLASS
 	atomic_t tcpc_usb_connected;
 
@@ -963,7 +968,7 @@ static int __mt6370_chgdet_handler(struct mt6370_pmu_charger_data *chg_data)
 		break;
 	case MT6370_CHG_TYPE_SDPNSTD:
 		chg_data->psy_desc.type = POWER_SUPPLY_TYPE_USB;
-		chg_data->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+		chg_data->psy_usb_type = POWER_SUPPLY_USB_TYPE_DCP;
 		break;
 	case MT6370_CHG_TYPE_CDP:
 		chg_data->psy_desc.type = POWER_SUPPLY_TYPE_USB_CDP;
@@ -1774,6 +1779,22 @@ static int mt6370_set_ircmp_vclamp(struct mt6370_pmu_charger_data *chg_data,
 /* =================== */
 /* Released interfaces */
 /* =================== */
+//+bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+int mt6370_hz_mode(struct charger_device *chg_dev, bool en)
+{
+	int ret = 0;
+	struct mt6370_pmu_charger_data *chg_data =
+		dev_get_drvdata(&chg_dev->dev);
+
+	chg_data->hz_mode = en;
+	dev_err(chg_data->dev, "%s: en = %d\n", __func__, en);
+
+	ret = mt6370_enable_hz(chg_data, en);
+	return ret;
+}
+#endif
+//-bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
 
 static int mt6370_enable_charging(struct charger_device *chg_dev, bool en)
 {
@@ -1809,6 +1830,14 @@ static int mt6370_enable_charging(struct charger_device *chg_dev, bool en)
 					   "%s: set ichg fail\n", __func__);
 		}
 	}
+
+//+bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+	/* still in hz mode, keep discharging */
+	if(en && chg_data->hz_mode)
+		ret = mt6370_hz_mode(chg_dev, en);
+#endif
+//-bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
 out:
 	ret = (en ? mt6370_pmu_reg_set_bit : mt6370_pmu_reg_clr_bit)
 		(chg_data->chip, MT6370_PMU_REG_CHGCTRL2, MT6370_MASK_CHG_EN);
@@ -2394,16 +2423,18 @@ static int mt6370_set_pep20_efficiency_table(struct charger_device *chg_dev)
 	if (!chg_mgr)
 		return -EINVAL;
 
-	chg_mgr->pe2.profile[0].vchr = 8000000;
-	chg_mgr->pe2.profile[1].vchr = 8000000;
-	chg_mgr->pe2.profile[2].vchr = 8000000;
-	chg_mgr->pe2.profile[3].vchr = 8500000;
-	chg_mgr->pe2.profile[4].vchr = 8500000;
+//+bug 621775,yaocankun.wt,add,20210120,add for enable pe20 charger
+	chg_mgr->pe2.profile[0].vchr = 6000000;
+	chg_mgr->pe2.profile[1].vchr = 6500000;
+	chg_mgr->pe2.profile[2].vchr = 7000000;
+	chg_mgr->pe2.profile[3].vchr = 7500000;
+	chg_mgr->pe2.profile[4].vchr = 8000000;
 	chg_mgr->pe2.profile[5].vchr = 8500000;
 	chg_mgr->pe2.profile[6].vchr = 9000000;
 	chg_mgr->pe2.profile[7].vchr = 9000000;
-	chg_mgr->pe2.profile[8].vchr = 9500000;
-	chg_mgr->pe2.profile[9].vchr = 9500000;
+	chg_mgr->pe2.profile[8].vchr = 9000000;
+	chg_mgr->pe2.profile[9].vchr = 9000000;
+//-bug 621775,yaocankun.wt,add,20210120,add for enable pe20 charger
 #endif
 	return 0;
 }
@@ -3982,6 +4013,11 @@ static struct charger_ops mt6370_chg_ops = {
 	.safety_check = mt6370_safety_check,
 	.get_min_charging_current = mt6370_get_min_ichg,
 	.get_min_input_current = mt6370_get_min_aicr,
+//+bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+	.hz_mode = mt6370_hz_mode,
+#endif
+//-bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
 
 	/* Safety timer */
 	.enable_safety_timer = mt6370_enable_safety_timer,
@@ -4163,8 +4199,19 @@ static int mt6370_charger_get_property(struct power_supply *psy,
 			break;
 		}
 		break;
+	case POWER_SUPPLY_PROP_TYPE:
+		val->intval = chg_data->psy_desc.type;
+		break;
 	case POWER_SUPPLY_PROP_USB_TYPE:
 		val->intval = chg_data->psy_usb_type;
+		break;
+	case POWER_SUPPLY_PROP_CURRENT_MAX:
+		if (chg_data->psy_desc.type == POWER_SUPPLY_TYPE_USB)
+			val->intval = 500000;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
+		if (chg_data->psy_desc.type == POWER_SUPPLY_TYPE_USB)
+			val->intval = 5000000;
 		break;
 	default:
 		ret = -ENODATA;
@@ -4188,6 +4235,7 @@ static int mt6370_charger_set_property(struct power_supply *psy,
 	default:
 		ret = -EINVAL;
 	}
+
 	return ret;
 }
 
@@ -4207,6 +4255,8 @@ static enum power_supply_property mt6370_charger_properties[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_USB_TYPE,
+	POWER_SUPPLY_PROP_CURRENT_MAX,
+	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 };
 
 static const struct power_supply_desc mt6370_charger_desc = {
@@ -4342,12 +4392,17 @@ static const struct regulator_desc mt6370_otg_rdesc = {
 	.csel_mask = MT6370_MASK_BOOST_OC,
 };
 
+//+Bug 627659, yaocankun.wt, add, 20210219, add typec polarity node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+extern int wt_set_cc_polarity_state(int state);
+#endif
+//-Bug 627659, yaocankun.wt, add, 20210219, add typec polarity node
 
 #ifdef CONFIG_TCPC_CLASS
 static int mt6370_get_charger_type(struct mt6370_pmu_charger_data *chg_data,
 	bool attach)
 {
-	union power_supply_propval prop, prop2;
+	union power_supply_propval prop, prop2, prop3;
 	static struct power_supply *chg_psy;
 	int ret = 0;
 
@@ -4366,30 +4421,36 @@ static int mt6370_get_charger_type(struct mt6370_pmu_charger_data *chg_data,
 			ret = power_supply_set_property(chg_psy,
 					POWER_SUPPLY_PROP_ONLINE, &prop);
 			ret = power_supply_get_property(chg_psy,
-					POWER_SUPPLY_PROP_USB_TYPE, &prop2);
-		} else
-			prop2.intval = POWER_SUPPLY_USB_TYPE_UNKNOWN;
-
-		pr_notice("%s type:%d\n", __func__, prop2.intval);
-
-		switch (prop2.intval) {
-		case POWER_SUPPLY_USB_TYPE_UNKNOWN:
-			chg_data->psy_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
-			chg_data->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
-			break;
-		case POWER_SUPPLY_USB_TYPE_SDP:
-			chg_data->psy_desc.type = POWER_SUPPLY_TYPE_USB;
-			chg_data->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
-			break;
-		case POWER_SUPPLY_USB_TYPE_CDP:
-			chg_data->psy_desc.type = POWER_SUPPLY_TYPE_USB_CDP;
-			chg_data->psy_usb_type = POWER_SUPPLY_USB_TYPE_CDP;
-			break;
-		case POWER_SUPPLY_USB_TYPE_DCP:
-			chg_data->psy_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
-			chg_data->psy_usb_type = POWER_SUPPLY_USB_TYPE_DCP;
-			break;
+					POWER_SUPPLY_PROP_TYPE, &prop2);
+			ret = power_supply_get_property(chg_psy,
+					POWER_SUPPLY_PROP_USB_TYPE, &prop3);
+		} else {
+			prop2.intval = POWER_SUPPLY_TYPE_UNKNOWN;
+			prop3.intval = POWER_SUPPLY_USB_TYPE_UNKNOWN;
+//+bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
+			ret = power_supply_set_property(chg_psy,
+					POWER_SUPPLY_PROP_ONLINE, &prop);
+//-bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
 		}
+
+		if (attach && chg_data->ignore_usb
+			&& (prop2.intval == POWER_SUPPLY_TYPE_USB)
+			&& (prop3.intval == POWER_SUPPLY_USB_TYPE_DCP))
+		{
+			pr_err("force to sdp because of pr_swap\n");
+			prop3.intval = POWER_SUPPLY_USB_TYPE_SDP;
+			ret = power_supply_set_property(chg_psy,
+					POWER_SUPPLY_PROP_USB_TYPE, &prop3);
+		}
+		pr_notice("%s type:%d usb_type:%d\n", __func__,
+					prop2.intval, prop3.intval);
+
+		chg_data->psy_desc.type = prop2.intval;
+		chg_data->psy_usb_type = prop3.intval;
+
+//+bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
+		power_supply_changed(chg_psy);
+//-bug 621775,yaocankun.wt,add,20210115,add for n21 charger bring up
 		power_supply_changed(chg_data->psy);
 	}
 	return prop2.intval;
@@ -4445,6 +4506,7 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 		    noti->typec_state.new_state == TYPEC_ATTACHED_NORP_SRC)) {
 			pr_info("%s USB Plug in, pol = %d\n", __func__,
 					noti->typec_state.polarity);
+			chg_data->ignore_usb = false;
 			handle_typec_attach(chg_data, true);
 		} else if ((noti->typec_state.old_state == TYPEC_ATTACHED_SNK ||
 		    noti->typec_state.old_state == TYPEC_ATTACHED_CUSTOM_SRC ||
@@ -4458,16 +4520,28 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 				kernel_power_off();
 #endif
 			}
+			chg_data->ignore_usb = false;
 			handle_typec_attach(chg_data, false);
 		} else if (noti->typec_state.old_state == TYPEC_ATTACHED_SRC &&
 			noti->typec_state.new_state == TYPEC_ATTACHED_SNK) {
 			pr_info("%s Source_to_Sink\n", __func__);
+			chg_data->ignore_usb = true;
 			handle_typec_attach(chg_data, true);
 		}  else if (noti->typec_state.old_state == TYPEC_ATTACHED_SNK &&
 			noti->typec_state.new_state == TYPEC_ATTACHED_SRC) {
 			pr_info("%s Sink_to_Source\n", __func__);
+			chg_data->ignore_usb = true;
 			handle_typec_attach(chg_data, false);
 		}
+//+Bug 627659, yaocankun.wt, add, 20210219, add typec polarity node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+		if(noti->typec_state.new_state != TYPEC_UNATTACHED){
+			wt_set_cc_polarity_state(noti->typec_state.polarity+1);
+		}else{
+			wt_set_cc_polarity_state(0);
+		}
+#endif
+//-Bug 627659, yaocankun.wt, add, 20210219, add typec polarity node
 		break;
 	default:
 		break;
@@ -4613,8 +4687,11 @@ static int mt6370_pmu_charger_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_TCPC_CLASS
-	chg_data->chg_psy = devm_power_supply_get_by_phandle(&pdev->dev,
-							     "charger");
+	if (chg_data->chg_psy == NULL) {
+		chg_data->chg_psy = devm_power_supply_get_by_phandle(&pdev->dev,
+								     "charger");
+		dev_info(chg_data->dev, "%sdevm_power_supply_get_by_phandle %lu\n", __func__, sizeof(chg_data->chg_psy));
+	}
 	if (IS_ERR(chg_data->chg_psy)) {
 		dev_notice(&pdev->dev, "Failed to get charger psy\n");
 		ret = PTR_ERR(chg_data->chg_psy);
@@ -4650,6 +4727,8 @@ static int mt6370_pmu_charger_probe(struct platform_device *pdev)
 		schedule_work(&chg_data->chgdet_work);
 #endif /* !CONFIG_TCPC_CLASS */
 
+//Bug 621775, yaocankun.wt,ADD,20210305, add charge IC info in MMI
+	hardwareinfo_set_prop(HARDWARE_CHARGER_IC_INFO, "MT6371_PMU_CHARGER");
 	dev_info(&pdev->dev, "%s successfully\n", __func__);
 	return 0;
 

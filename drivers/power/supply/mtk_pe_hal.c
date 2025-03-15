@@ -147,7 +147,7 @@ int pe_hal_get_vbus(struct chg_alg_device *alg)
 int pe_hal_get_ibat(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop;
-	struct power_supply *bat_psy = NULL;
+	static struct power_supply *bat_psy = NULL;
 	int ret;
 	struct mtk_pe *pe;
 
@@ -155,9 +155,12 @@ int pe_hal_get_ibat(struct chg_alg_device *alg)
 		return -EINVAL;
 
 	pe = dev_get_drvdata(&alg->dev);
-	bat_psy = devm_power_supply_get_by_phandle(&pe->pdev->dev,
-						       "gauge");
-	if (IS_ERR(bat_psy)) {
+	if (bat_psy == NULL) {
+		bat_psy = devm_power_supply_get_by_phandle(&pe->pdev->dev,
+							       "gauge");
+		pr_debug("%s devm_power_supply_get_by_phandle:%d\n", __func__, sizeof(bat_psy));
+	}
+	if (bat_psy == NULL || IS_ERR(bat_psy)) {
 		pr_notice("%s Couldn't get bat_psy\n", __func__);
 		ret = 0;
 	} else {
@@ -235,7 +238,7 @@ int pe_hal_set_mivr(struct chg_alg_device *alg, enum chg_idx chgidx, int uV)
 int pe_hal_get_uisoc(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop;
-	struct power_supply *bat_psy = NULL;
+	static struct power_supply *bat_psy = NULL;
 	int ret;
 	struct mtk_pe *pe;
 
@@ -243,9 +246,12 @@ int pe_hal_get_uisoc(struct chg_alg_device *alg)
 		return -EINVAL;
 
 	pe = dev_get_drvdata(&alg->dev);
-	bat_psy = devm_power_supply_get_by_phandle(&pe->pdev->dev,
-						       "gauge");
-	if (IS_ERR(bat_psy)) {
+	if (bat_psy == NULL) {
+		bat_psy = devm_power_supply_get_by_phandle(&pe->pdev->dev,
+							       "gauge");
+		pr_debug("%s devm_power_supply_get_by_phandle:%d\n", __func__, sizeof(bat_psy));
+	}
+	if (bat_psy == NULL || IS_ERR(bat_psy)) {
 		pr_notice("%s Couldn't get bat_psy\n", __func__);
 		ret = 50;
 	} else {
@@ -271,8 +277,11 @@ int pe_hal_get_charger_type(struct chg_alg_device *alg)
 	chg_psy = power_supply_get_by_name("mtk-master-charger");
 	if (chg_psy == NULL || IS_ERR(chg_psy)) {
 		pr_notice("%s Couldn't get chg_psy\n", __func__);
+		return -EINVAL;
 	} else {
 		info = (struct mtk_charger *)power_supply_get_drvdata(chg_psy);
+		if (info == NULL)
+			return -EINVAL;
 		ret = info->chr_type;
 	}
 

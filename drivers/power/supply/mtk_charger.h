@@ -10,6 +10,11 @@
 #include "charger_class.h"
 #include "adapter_class.h"
 #include "mtk_charger_algorithm_class.h"
+//+bug 623285,yaocankun.wt,add,20210126,add for support AFC charger
+#ifdef CONFIG_AFC_CHARGER
+#include "afc_charger_intf.h"
+#endif
+//-bug 623285,yaocankun.wt,add,20210126,add for support AFC charger
 
 #define CHARGING_INTERVAL 10
 #define CHARGING_FULL_INTERVAL 20
@@ -17,6 +22,12 @@
 #define CHRLOG_ERROR_LEVEL	1
 #define CHRLOG_INFO_LEVEL	2
 #define CHRLOG_DEBUG_LEVEL	3
+
+//+Bug 623299, yaocankun.wt, add, 20210219, add battery hv disable
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+extern bool batt_hv_disable;
+#endif
+//-Bug 623299, yaocankun.wt, add, 20210219, add battery hv disable
 
 extern int chr_get_debug_level(void);
 
@@ -73,11 +84,19 @@ struct mtk_charger;
 #define CHG_BAT_LT_STATUS	(1 << 5)
 #define CHG_TYPEC_WD_STATUS	(1 << 6)
 
+//+chk 80459,xuejizhou.wt,ADD,20210201,SW JEITA configuration
+#ifndef CONFIG_CHARGER_BQ2415X
+//+bug 621775,yaocankun.wt,mod,20210121,mod for n21 jeita config
+#ifndef CONFIG_WT_PROJECT_S96717RA1
 /* Battery Temperature Protection */
 #define MIN_CHARGE_TEMP  0
 #define MIN_CHARGE_TEMP_PLUS_X_DEGREE	6
 #define MAX_CHARGE_TEMP  50
 #define MAX_CHARGE_TEMP_MINUS_X_DEGREE	47
+#endif
+//-bug 621775,yaocankun.wt,mod,20210121,mod for n21 jeita config
+#endif // !CONFIG_CHARGER_BQ2415X
+//+chk 80459,xuejizhou.wt,ADD,20210201,SW JEITA configuration
 
 #define MAX_ALG_NO 10
 
@@ -103,6 +122,105 @@ struct battery_thermal_protection_data {
 };
 
 /* sw jeita */
+//+bug 621775,yaocankun.wt,mod,20210121,mod for n21 jeita config
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+#define JEITA_TEMP_ABOVE_T4_CV	4100000
+#define JEITA_TEMP_T3_TO_T4_CV	4100000
+#define JEITA_TEMP_T2_TO_T3_CV	4400000
+#define JEITA_TEMP_T1_TO_T2_CV	4400000
+#define JEITA_TEMP_T0_TO_T1_CV	4400000
+#define JEITA_TEMP_BELOW_T0_CV	4400000
+#define JEITA_TEMP_ABOVE_T4_CC	0
+#define JEITA_TEMP_T3_TO_T4_CC	1400000
+#define JEITA_TEMP_T2_TO_T3_CC	200000
+#define JEITA_TEMP_T1_TO_T2_CC	1200000
+#define JEITA_TEMP_T0_TO_T1_CC	400000
+#define JEITA_TEMP_BELOW_T0_CC	0
+#define TEMP_T4_THRES  60
+#define TEMP_T4_THRES_MINUS_X_DEGREE 59
+#define TEMP_T3_THRES  45
+#define TEMP_T3_THRES_MINUS_X_DEGREE 44
+#define TEMP_T2_THRES  10
+#define TEMP_T2_THRES_PLUS_X_DEGREE 11
+#define TEMP_T1_THRES  5
+#define TEMP_T1_THRES_PLUS_X_DEGREE 6
+#define TEMP_T0_THRES  0
+#define TEMP_T0_THRES_PLUS_X_DEGREE  0
+#define TEMP_NEG_10_THRES 0
+
+//+bug 621775,yaocankun.wt,mod,20210121,charge current limit for AP overheat
+#define AP_TEMP_ABOVE_T2_CC	500000
+#define AP_TEMP_T1_TO_T2_CC	1400000
+#define AP_TEMP_T0_TO_T1_CC	2350000
+#define AP_TEMP_BELOW_T0_CC	2800000
+#define AP_TEMP_HIGH_CC_LCMON 500000
+#define AP_TEMP_LOW_CC_LCMON 800000
+
+#define AP_TEMP_T2_THRES  48
+#define AP_TEMP_T2_THRES_MINUS_X_DEGREE 47
+#define AP_TEMP_T1_THRES  45
+#define AP_TEMP_T1_THRES_MINUS_X_DEGREE 44
+#define AP_TEMP_T0_THRES  40
+#define AP_TEMP_T0_THRES_MINUS_X_DEGREE 39
+#define AP_TEMP_THRES_LCMON 44
+#define AP_TEMP_THRES_MINUS_X_DEGREE_LCMON 43
+//-bug 621775,yaocankun.wt,mod,20210121,charge current limit for AP overheat
+
+/* Battery Temperature Protection */
+#define MIN_CHARGE_TEMP  0
+#define MIN_CHARGE_TEMP_PLUS_X_DEGREE	0
+#define MAX_CHARGE_TEMP  60
+#define MAX_CHARGE_TEMP_MINUS_X_DEGREE	60
+//-bug 621775,yaocankun.wt,mod,20210121,mod for n21 jeita config
+//+chk 80459,xuejizhou.wt,ADD,20210201,SW JEITA configuration
+#elif CONFIG_CHARGER_BQ2415X
+#define JEITA_TEMP_ABOVE_T4_CV	4100000
+#define JEITA_TEMP_T3_TO_T4_CV	4100000
+#define JEITA_TEMP_T2_TO_T3_CV	4400000
+#define JEITA_TEMP_T1_TO_T2_CV	4400000
+#define JEITA_TEMP_T0_TO_T1_CV	4400000
+#define JEITA_TEMP_BELOW_T0_CV	4400000
+#define JEITA_TEMP_ABOVE_T4_CC	0
+#define JEITA_TEMP_T3_TO_T4_CC	1200000
+#define JEITA_TEMP_T2_TO_T3_CC	1500000
+#define JEITA_TEMP_T1_TO_T2_CC	1200000
+#define JEITA_TEMP_T0_TO_T1_CC	400000
+#define JEITA_TEMP_BELOW_T0_CC	0
+#define TEMP_T4_THRES  55
+#define TEMP_T4_THRES_MINUS_X_DEGREE 52
+#define TEMP_T3_THRES  45
+#define TEMP_T3_THRES_MINUS_X_DEGREE 43
+#define TEMP_T2_THRES  10
+#define TEMP_T2_THRES_PLUS_X_DEGREE 8
+#define TEMP_T1_THRES  5
+#define TEMP_T1_THRES_PLUS_X_DEGREE 3
+#define TEMP_T0_THRES  0
+#define TEMP_T0_THRES_PLUS_X_DEGREE  0
+#define TEMP_NEG_10_THRES 0
+//-bug  612420,xuejizhou.wt,mod,20210804,charge current limit for AP overheat
+#define AP_TEMP_ABOVE_T2_CC	600000
+#define AP_TEMP_T1_TO_T2_CC	800000
+#define AP_TEMP_T0_TO_T1_CC	1000000
+#define AP_TEMP_BELOW_T0_CC	1500000
+#define AP_TEMP_HIGH_CC_LCMON 500000
+#define AP_TEMP_LOW_CC_LCMON 800000
+
+#define AP_TEMP_T2_THRES  53
+#define AP_TEMP_T2_THRES_MINUS_X_DEGREE 42
+#define AP_TEMP_T1_THRES  50
+#define AP_TEMP_T1_THRES_MINUS_X_DEGREE 48
+#define AP_TEMP_T0_THRES  45
+#define AP_TEMP_T0_THRES_MINUS_X_DEGREE 43
+#define AP_TEMP_THRES_LCMON 44
+#define AP_TEMP_THRES_MINUS_X_DEGREE_LCMON 43
+//+bug  612420,xuejizhou.wt,mod,20210804,charge current limit for AP overheat
+/* Battery Temperature Protection */
+#define MIN_CHARGE_TEMP  0
+#define MIN_CHARGE_TEMP_PLUS_X_DEGREE	0
+#define MAX_CHARGE_TEMP  55
+#define MAX_CHARGE_TEMP_MINUS_X_DEGREE	52
+//-chk 80459,xuejizhou.wt,ADD,20210201,SW JEITA configuration
+#else
 #define JEITA_TEMP_ABOVE_T4_CV	4240000
 #define JEITA_TEMP_T3_TO_T4_CV	4240000
 #define JEITA_TEMP_T2_TO_T3_CV	4340000
@@ -120,6 +238,8 @@ struct battery_thermal_protection_data {
 #define TEMP_T0_THRES  0
 #define TEMP_T0_THRES_PLUS_X_DEGREE  0
 #define TEMP_NEG_10_THRES 0
+#endif
+
 
 /*
  * Software JEITA
@@ -142,6 +262,7 @@ struct sw_jeita_data {
 	int sm;
 	int pre_sm;
 	int cv;
+	int cc;//bug 621775,yaocankun.wt,mod,20210121,mod for n21 jeita config
 	bool charging;
 	bool error_recovery_flag;
 };
@@ -157,6 +278,7 @@ struct mtk_charger_algorithm {
 
 struct charger_custom_data {
 	int battery_cv;	/* uv */
+	int battery_cc;
 	int max_charger_voltage;
 	int max_charger_voltage_setting;
 	int min_charger_voltage;
@@ -173,6 +295,7 @@ struct charger_custom_data {
 	int jeita_temp_t1_to_t2_cv;
 	int jeita_temp_t0_to_t1_cv;
 	int jeita_temp_below_t0_cv;
+
 	int temp_t4_thres;
 	int temp_t4_thres_minus_x_degree;
 	int temp_t3_thres;
@@ -184,6 +307,32 @@ struct charger_custom_data {
 	int temp_t0_thres;
 	int temp_t0_thres_plus_x_degree;
 	int temp_neg_10_thres;
+//+Bug516174,zhaosidong.wt,ADD,20191126,charge current limit for AP overheat
+#if defined CONFIG_WT_PROJECT_S96717RA1 || defined CONFIG_CHARGER_BQ2415X
+	int jeita_temp_above_t4_cc;//bug 621775,yaocankun.wt,mod,20210121,mod for n21 jeita config
+	int jeita_temp_t3_to_t4_cc;
+	int jeita_temp_t2_to_t3_cc;
+	int jeita_temp_t1_to_t2_cc;
+	int jeita_temp_t0_to_t1_cc;
+	int jeita_temp_below_t0_cc;
+	int ap_temp_above_t2_cc;;
+	int ap_temp_t1_to_t2_cc;
+	int ap_temp_t0_to_t1_cc;
+	int ap_temp_below_t0_cc;
+	int ap_temp_high_lcmon_cc;
+	int ap_temp_low_lcmon_cc;
+
+	int ap_temp_t2_thres;
+	int ap_temp_t2_thres_minus_x_degree;
+	int ap_temp_t1_thres;
+	int ap_temp_t1_thres_minus_x_degree;
+	int ap_temp_t0_thres;
+	int ap_temp_t0_thres_minus_x_degree;
+	int ap_temp_thres_lcmon;
+	int ap_temp_thres_minus_x_degree_lcmon;
+#endif
+//-Bug516174,zhaosidong.wt,ADD,20191126,charge current limit for AP overheat
+
 
 	/* battery temperature protection */
 	int mtk_temperature_recharge_support;
@@ -299,6 +448,15 @@ struct mtk_charger {
 	bool sw_safety_timer_setting;
 	struct timespec charging_begin_time;
 
+	//+Bug516174,zhaosidong.wt,ADD,20191126,charge current limit for AP overheat
+#if defined CONFIG_WT_PROJECT_S96717RA1 || defined CONFIG_CHARGER_BQ2415X
+	int ap_temp;
+	bool lcmoff;
+	struct sw_jeita_data ap_thermal_lcmoff;
+	struct sw_jeita_data ap_thermal_lcmon;
+#endif
+	//-Bug516174,zhaosidong.wt,ADD,20191126,charge current limit for AP overheat
+
 	/* sw jeita */
 	bool enable_sw_jeita;
 	struct sw_jeita_data sw_jeita;
@@ -314,6 +472,12 @@ struct mtk_charger {
 	bool water_detected;
 
 	bool enable_dynamic_mivr;
+//+bug 623285,yaocankun.wt,add,20210126,add for support AFC charger
+#ifdef CONFIG_AFC_CHARGER
+	bool enable_afc;
+	struct afc_dev afc;
+#endif
+//-bug 623285,yaocankun.wt,add,20210126,add for support AFC charger
 };
 
 /* functions which framework needs*/
@@ -335,10 +499,19 @@ extern int get_charger_charging_current(struct mtk_charger *info,
 	struct charger_device *chg);
 extern int get_charger_input_current(struct mtk_charger *info,
 	struct charger_device *chg);
+extern int get_charger_zcv(struct mtk_charger *info,
+	struct charger_device *chg);
 extern void _wake_up_charger(struct mtk_charger *info);
+//+bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+extern int charger_manager_enable_charging_new(
+	struct mtk_charger *info, bool en, int type);
+#endif
+//-bug 621775,yaocankun.wt,mod,20210201,charge add start/stop charging control node
 
 /* functions for other */
 extern int mtk_chg_enable_vbus_ovp(bool enable);
 
+extern bool fast_charger_connect(struct mtk_charger *info);//Bug 615301,xuejizhou.wt,ADD,20210115,hv charger status
 
 #endif /* __MTK_CHARGER_H */

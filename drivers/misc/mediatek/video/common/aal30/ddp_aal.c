@@ -1299,9 +1299,7 @@ static void disp_aal_notify_backlight_log(int bl_1024)
 			pr_debug("disp_aal_notify_backlight_changed: %d/1023\n",
 				bl_1024);
 		} else {
-			scnprintf(g_aal_log_buffer + strlen(g_aal_log_buffer),
-				sizeof(g_aal_log_buffer) -
-				strlen(g_aal_log_buffer),
+			sprintf(g_aal_log_buffer + strlen(g_aal_log_buffer),
 				", %d/1023 %03lu.%03lu",
 				bl_1024, tsec, tusec);
 			pr_debug("%s\n", g_aal_log_buffer);
@@ -1309,14 +1307,12 @@ static void disp_aal_notify_backlight_log(int bl_1024)
 		}
 	} else {
 		if (g_aal_log_index == 0) {
-			scnprintf(g_aal_log_buffer, sizeof(g_aal_log_buffer),
+			sprintf(g_aal_log_buffer,
 			"disp_aal_notify_backlight_changed %d/1023 %03lu.%03lu",
 			bl_1024, tsec, tusec);
 			g_aal_log_index += 1;
 		} else {
-			scnprintf(g_aal_log_buffer + strlen(g_aal_log_buffer),
-				sizeof(g_aal_log_buffer) -
-				strlen(g_aal_log_buffer),
+			sprintf(g_aal_log_buffer + strlen(g_aal_log_buffer),
 				", %d/1023 %03lu.%03lu",
 				bl_1024, tsec, tusec);
 			g_aal_log_index += 1;
@@ -2802,8 +2798,7 @@ void aal_test(const char *cmd, char *debug_output)
 		atomic_set(&g_aal_force_relay, bypass);
 		disp_aal_trigger_refresh(AAL_REFRESH_17MS);
 	} else if (strncmp(cmd, "getBypass:", 10) == 0) {
-		scnprintf(debug_output, 30,
-			"AAL HW Relay: %d\n",
+		sprintf(debug_output, "AAL HW Relay: %d\n",
 			atomic_read(&g_aal_force_relay));
 	} else if (strncmp(cmd, "ut:", 3) == 0) { /* debug command for UT */
 		aal_ut_cmd(cmd + 3);

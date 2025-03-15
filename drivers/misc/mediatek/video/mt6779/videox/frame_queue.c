@@ -77,23 +77,23 @@ static int _do_wait_fence(struct sync_fence **src_fence, int session_id,
 		dprec_done(&session_info->event_wait_fence, present_idx, ret);
 
 	if (ret == -ETIME) {
-		n = scnprintf(msg, len,
+		n = snprintf(msg, len,
 			     "== display fence wait timeout for 1000ms. ");
-		n += scnprintf(msg + n, len - n,
+		n += snprintf(msg + n, len - n,
 			      "ret%d,layer%d,fd%d,idx%d ==>\n",
 			      ret, timeline, fence_fd, buf_idx);
 		DISP_PR_ERR("%s", msg);
 	} else if (ret != 0) {
-		n = scnprintf(msg, len,
+		n = snprintf(msg, len,
 			     "== display fence wait status error. ");
-		n += scnprintf(msg + n, len - n,
+		n += snprintf(msg + n, len - n,
 			      "ret%d,layer%d,fd%d,idx%d ==>\n",
 			      ret, timeline, fence_fd, buf_idx);
 		DISP_PR_ERR("%s", msg);
 	} else {
-		n = scnprintf(msg, len,
+		n = snprintf(msg, len,
 			     "== display fence wait done! ");
-		n += scnprintf(msg + n, len - n,
+		n += snprintf(msg + n, len - n,
 			      "ret%d,layer%d,fd%d,idx%d ==\n",
 			      ret, timeline, fence_fd, buf_idx);
 		DISPDBG("%s", msg);

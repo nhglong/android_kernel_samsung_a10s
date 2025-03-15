@@ -33,6 +33,10 @@
 #if defined(CONFIG_MTK_BASE_POWER)
 #include "mtk_spm_resource_req.h"
 
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+#include <linux/cable_type_notifier.h>
+#endif
+
 static int dpidle_status = USB_DPIDLE_ALLOWED;
 module_param(dpidle_status, int, 0644);
 
@@ -180,7 +184,9 @@ static const struct of_device_id apusb_of_ids[] = {
 };
 
 MODULE_DEVICE_TABLE(of, apusb_of_ids);
-
+#if defined(CONFIG_CHARGER_BQ2415X) || defined(CONFIG_WT_PROJECT_S96717RA1)
+extern int g_bootmode;
+#endif
 static int mt_usb_psy_notifier(struct notifier_block *nb,
 				unsigned long event, void *ptr)
 {
@@ -191,10 +197,41 @@ static int mt_usb_psy_notifier(struct notifier_block *nb,
 
 		DBG(0, "psy=%s, event=%d", psy->desc->name, event);
 
+//+EXTB P210404-01933,xuejizhou.wt,add,20210426,charge type detecion takes more than 20 sec in lpm mode
+#if defined(CONFIG_CHARGER_BQ2415X) || defined(CONFIG_WT_PROJECT_S96717RA1)
+	if (g_bootmode == KERNEL_POWER_OFF_CHARGING_BOOT ||
+		g_bootmode == LOW_POWER_OFF_CHARGING_BOOT) {
+		/* do nothing */
+		pr_notice("%s: do nothing in KPOC\n", __func__);
+	}
+#endif 
+
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+			if (usb_cable_connected(musb)) {
+				DBG(0, "musb->sec_cable_type=%d", musb->sec_cable_type);
+				if (!musb->is_host) {
+					switch (musb->sec_cable_type) {
+						case POWER_SUPPLY_USB_TYPE_SDP:
+							cable_type_notifier_set_attached_dev(CABLE_TYPE_USB_SDP);
+							break;
+						case POWER_SUPPLY_USB_TYPE_CDP:
+							cable_type_notifier_set_attached_dev(CABLE_TYPE_USB_CDP);
+							break;
+						default:
+							break;
+					}
+				}
+			} else {
+				if (!musb->is_host)
+					cable_type_notifier_set_attached_dev(CABLE_TYPE_NONE);
+			}
+#else
 		if (usb_cable_connected(musb))
 			mt_usb_connect();
 		else
 			mt_usb_disconnect();
+#endif
+//-EXTB P210404-01933,xuejizhou.wt,add,20210426,charge type detecion takes more than 20 sec in lpm mode
 	}
 	return NOTIFY_DONE;
 }
@@ -203,8 +240,10 @@ static int mt_usb_psy_init(struct musb *musb)
 {
 	int ret = 0;
 	struct device *dev = musb->controller->parent;
-
-	musb->usb_psy = devm_power_supply_get_by_phandle(dev, "charger");
+	if (musb->usb_psy == NULL) {
+		musb->usb_psy = devm_power_supply_get_by_phandle(dev, "charger");
+		pr_notice("%s:devm_power_supply_get_by_phandle size %d\n", __func__, sizeof(musb->usb_psy));
+	}
 	if (IS_ERR_OR_NULL(musb->usb_psy)) {
 		DBG(0, "couldn't get usb_psy\n");
 		return -EINVAL;
@@ -542,11 +581,16 @@ bool usb_cable_connected(struct musb *musb)
 
 	DBG(0, "online=%d, type=%d\n", pval.intval, tval.intval);
 
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+	musb->sec_cable_type = tval.intval;
+#endif
+
 	if (pval.intval && (tval.intval == POWER_SUPPLY_USB_TYPE_SDP ||
-			tval.intval == POWER_SUPPLY_USB_TYPE_CDP))
+			tval.intval == POWER_SUPPLY_USB_TYPE_CDP)) {
 		return true;
-	else
+	} else {
 		return false;
+	}
 }
 
 static bool cmode_effect_on(void)
@@ -584,9 +628,24 @@ void do_connection_work(struct work_struct *data)
 	/* additional check operation here */
 	if (musb_force_on)
 		usb_on = true;
-	else if (work->ops == CONNECTION_OPS_CHECK)
+	else if (work->ops == CONNECTION_OPS_CHECK) {
 		usb_on = usb_connected;
-	else
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+		if (!musb_is_host() && usb_on) {
+			DBG(0, "mtk_musb->sec_cable_type=%d", mtk_musb->sec_cable_type);
+			switch (mtk_musb->sec_cable_type) {
+				case POWER_SUPPLY_USB_TYPE_SDP:
+					cable_type_notifier_set_attached_dev(CABLE_TYPE_USB_SDP);
+					break;
+				case POWER_SUPPLY_USB_TYPE_CDP:
+					cable_type_notifier_set_attached_dev(CABLE_TYPE_USB_CDP);
+					break;
+				default:
+					break;
+			}
+		}
+#endif
+	} else
 		usb_on = (work->ops ==
 			CONNECTION_OPS_CONN ? true : false);
 

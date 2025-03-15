@@ -604,7 +604,7 @@ int pd_hal_charger_enable_chip(struct chg_alg_device *alg,
 int pd_hal_get_uisoc(struct chg_alg_device *alg)
 {
 	union power_supply_propval prop;
-	struct power_supply *bat_psy = NULL;
+	static struct power_supply *bat_psy = NULL;
 	int ret;
 	struct mtk_pd *pd;
 
@@ -612,8 +612,11 @@ int pd_hal_get_uisoc(struct chg_alg_device *alg)
 		return -EINVAL;
 
 	pd = dev_get_drvdata(&alg->dev);
-	bat_psy = devm_power_supply_get_by_phandle(&pd->pdev->dev,
+	if (bat_psy == NULL) {
+		bat_psy = devm_power_supply_get_by_phandle(&pd->pdev->dev,
 						       "gauge");
+		pr_notice("%sdevm_power_supply_get_by_phandle:%d\n", __func__, sizeof(bat_psy));
+	}
 	if (IS_ERR_OR_NULL(bat_psy)) {
 		pr_notice("%s Couldn't get bat_psy\n", __func__);
 		ret = 50;

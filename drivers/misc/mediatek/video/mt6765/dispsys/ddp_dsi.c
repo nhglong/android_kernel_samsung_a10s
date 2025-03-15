@@ -3740,6 +3740,9 @@ void DSI_set_cmdq_V2(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 		return;
 	}
 
+	DISPMSG("DSI%d set current mode = %d\n",
+		 d, DSI_REG[d]->DSI_MODE_CTRL.MODE);
+
 	if (DSI_REG[d]->DSI_MODE_CTRL.MODE) { /* vdo cmd */
 		struct DSI_VM_CMD_CON_REG vm_cmdq;
 		struct DSI_VM_CMDQ *vm_data;

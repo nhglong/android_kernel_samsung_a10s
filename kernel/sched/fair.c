@@ -10,7 +10,7 @@
  *  Various enhancements by Dmitry Adamushko.
  *  (C) 2007 Dmitry Adamushko <dmitry.adamushko@gmail.com>
  *
- *  Group scheduling enhancements by Srivatsa Vaddagiri
+ *  Group scheduling enhancements by Srivatsa Vaddagiri109
  *  Copyright IBM Corporation, 2007
  *  Author: Srivatsa Vaddagiri <vatsa@linux.vnet.ibm.com>
  *
@@ -10920,7 +10920,12 @@ static int idle_balance(struct rq *this_rq, struct rq_flags *rf)
 		if (sd)
 			update_next_balance(sd, &next_balance);
 		rcu_read_unlock();
-
+#ifdef CONFIG_MTK_IDLE_BALANCE_ENHANCEMENT
+		if (!this_rq->rd->overload) {
+			raw_spin_unlock(&this_rq->lock);
+			goto hinted_idle_pull;
+		}
+#endif
 		nohz_newidle_balance(this_rq);
 
 		goto out;
@@ -10968,6 +10973,7 @@ static int idle_balance(struct rq *this_rq, struct rq_flags *rf)
 	rcu_read_unlock();
 
 #ifdef CONFIG_MTK_IDLE_BALANCE_ENHANCEMENT
+hinted_idle_pull:
 	/* We could not pull task to this_cpu when this_rq offline */
 	if (this_rq->online && !pulled_task)
 		pulled_task = aggressive_idle_pull(this_cpu);

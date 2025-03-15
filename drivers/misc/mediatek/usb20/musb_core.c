@@ -29,6 +29,10 @@
 #include "mtk_musb.h"
 #endif
 
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+#include <linux/usblog_proc_notify.h>
+#endif
+
 static void (*usb_hal_dpidle_request_fptr)(int);
 void usb_hal_dpidle_request(int mode)
 {
@@ -156,9 +160,8 @@ module_param_named(dbg_uart, musb_uart_debug, uint, 0644);
 
 #define MUSB_DRIVER_NAME "musb-hdrc"
 const char musb_driver_name[] = MUSB_DRIVER_NAME;
-#if defined(CONFIG_R_PORTING)
 static DEFINE_IDA(musb_ida);
-#endif
+
 MODULE_DESCRIPTION(DRIVER_INFO);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
@@ -265,36 +268,26 @@ static inline struct musb *dev_to_musb(struct device *dev)
 }
 
 /*-------------------------------------------------------------------------*/
-#if defined(CONFIG_R_PORTING)
 int musb_get_id(struct device *dev, gfp_t gfp_mask)
 {
 	int ret;
-	int id;
 
-	ret = ida_pre_get(&musb_ida, gfp_mask);
-	if (!ret) {
-		dev_notice(dev, "failed to reserve resource for id\n");
-		return -ENOMEM;
-	}
-
-	ret = ida_get_new(&musb_ida, &id);
+	ret = ida_alloc(&musb_ida, gfp_mask);
 	if (ret < 0) {
 		dev_notice(dev, "failed to allocate a new id\n");
 		return ret;
 	}
 
-	return id;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(musb_get_id);
 
 void musb_put_id(struct device *dev, int id)
 {
-
 	dev_dbg(dev, "removing id %d\n", id);
-	ida_remove(&musb_ida, id);
+	ida_free(&musb_ida, id);
 }
 EXPORT_SYMBOL_GPL(musb_put_id);
-#endif
 
 #ifdef NEVER				/* #ifndef CONFIG_BLACKFIN */
 static int musb_ulpi_read(struct usb_phy *phy, u32 offset)
@@ -528,10 +521,9 @@ void musb_load_testpacket(struct musb *musb)
 /*
  * Handles OTG hnp timeouts, such as b_ase0_brst
  */
-#if defined(CONFIG_R_PORTING)
-static void musb_otg_timer_func(unsigned long data)
+static void musb_otg_timer_func(struct timer_list *t)
 {
-	struct musb *musb = (struct musb *)data;
+	struct musb	*musb = from_timer(musb, t, otg_timer);
 	unsigned long flags;
 	bool vbus_off = false;
 
@@ -570,7 +562,6 @@ static void musb_otg_timer_func(unsigned long data)
 	if (vbus_off)
 		musb_platform_set_vbus(musb, 0);
 }
-#endif
 
 #if defined(CONFIG_USBIF_COMPLIANCE)
 void musb_set_host_request_flag(struct musb *musb,
@@ -1131,6 +1122,11 @@ b_host:
 		DBG(0, "%s:%d MUSB_INTR_RESET (%s)\n",
 			__func__, __LINE__,
 			otg_state_string(musb->xceiv->otg->state));
+
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+			store_usblog_notify(NOTIFY_USBSTATE,
+						(void *)"USB_STATE=RESET", NULL);
+#endif
 		if ((devctl & MUSB_DEVCTL_HM) != 0) {
 			/*
 			 * Looks like non-HS BABBLE can be ignored, but
@@ -2492,9 +2488,7 @@ static int musb_init_controller
 			? MUSB_CONTROLLER_MHDRC : MUSB_CONTROLLER_HDRC, musb);
 	if (status < 0)
 		goto fail3;
-#if defined(CONFIG_R_PORTING)
-	setup_timer(&musb->otg_timer, musb_otg_timer_func, (unsigned long)musb);
-#endif
+	timer_setup(&musb->otg_timer, musb_otg_timer_func, 0);
 #if defined(CONFIG_USBIF_COMPLIANCE)
 	vbus_polling_tsk =
 		kthread_create(polling_vbus_value, NULL, "polling_vbus_thread");

@@ -32,13 +32,29 @@
 #endif
 #include "tee_client_api.h"
 
+#if IS_ENABLED(CONFIG_TEEGRIS_TEE_SUPPORT)
+#include <tee_client_api.h>
+#endif
+
+#if IS_ENABLED(CONFIG_TEEGRIS_TEE_SUPPORT)
+	#define TYPE_STRUCT
+#else
+	#define TYPE_STRUCT struct
+#endif
+
 /* clang-format off */
+#if IS_ENABLED(CONFIG_TEEGRIS_TEE_SUPPORT)
+#define SECMEM_TL_GP_UUID_STRING NULL
+#define SECMEM_TL_GP_UUID \
+	{ 0x00000000, 0x4D54, 0x4B5F, \
+	{ 0x42, 0x46, 0x53, 0x4D, 0x45, 0x4D, 0x54, 0x41 } }
+#else
+#define SECMEM_TL_GP_UUID_STRING "08030000000000000000000000000000"
 #define SECMEM_TL_GP_UUID \
 	{ 0x08030000, 0x0000, 0x0000, \
 	{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 } }
+#endif
 /* clang-format on */
-
-#define SECMEM_TL_GP_UUID_STRING "08030000000000000000000000000000"
 
 struct TEE_GP_SESSION_DATA {
 	struct TEEC_Context context;

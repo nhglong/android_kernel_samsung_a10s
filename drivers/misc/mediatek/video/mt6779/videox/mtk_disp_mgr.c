@@ -582,7 +582,7 @@ void dump_input_cfg_info(struct disp_input_config *input_cfg,
 	char msg[len];
 	int n = 0;
 
-	n = scnprintf(msg, len,
+	n = snprintf(msg, len,
 		"S+/%s%d/L%u/idx%u/(%u,%u,%ux%u)(%u,%u,%ux%u)/%s/ds%d/%u/mva0x%08lx/compr:%u/v_p:%u/t%d/s%d\n",
 		disp_session_type_str(session), DISP_SESSION_DEV(session),
 		input_cfg->layer_id, input_cfg->next_buff_idx,
@@ -594,7 +594,11 @@ void dump_input_cfg_info(struct disp_input_config *input_cfg,
 		input_cfg->src_pitch, (unsigned long)(input_cfg->src_phy_addr),
 		input_cfg->compress, input_cfg->src_v_pitch,
 		get_ovl2mem_ticket(), input_cfg->security);
-	_DISP_PRINT_FENCE_OR_ERR(is_err, "%s", msg);
+	if (n < 0) {
+		DISP_PR_INFO("[%s %d]snprintf err:%d\n",
+			     __func__, __LINE__, n);
+	} else
+		_DISP_PRINT_FENCE_OR_ERR(is_err, "%s", msg);
 }
 
 static int _get_layer_cnt(unsigned int session)
@@ -775,12 +779,16 @@ static int input_config_preprocess(struct disp_frame_cfg_t *cfg)
 		char msg[len];
 		int n = 0;
 
-		n = scnprintf(msg, len,
+		n = snprintf(msg, len,
 			     "set_%s_buffer, config_layer_num invalid = %d, max_layer_num = %d!\n",
 			     disp_session_type_str(session),
 			     cfg->input_layer_num,
 			     _get_layer_cnt(session));
-		DISP_PR_INFO("%s", msg);
+		if (n < 0) {
+			DISP_PR_INFO("[%s %d]snprintf err:%d\n",
+				     __func__, __LINE__, n);
+		} else
+			DISP_PR_INFO("%s", msg);
 		return 0;
 	}
 
@@ -931,7 +939,7 @@ static int output_config_preprocess(struct disp_frame_cfg_t *cfg)
 		}
 	}
 
-	n = scnprintf(msg, len,
+	n = snprintf(msg, len,
 		     "S+O/%s%d/L%d/idx%u/L%d/idx%u/(%u,%u,%ux%u)/%s/%u/%u/pa0x%08lx/mva0x%08lx/t%d/sec%d\n",
 		     disp_session_type_str(session), DISP_SESSION_DEV(session),
 		     disp_sync_get_output_timeline_id(),
@@ -944,7 +952,11 @@ static int output_config_preprocess(struct disp_frame_cfg_t *cfg)
 		     cfg->output_cfg.pitch, cfg->output_cfg.pitchUV,
 		     (unsigned long)cfg->output_cfg.pa, dst_mva,
 		     get_ovl2mem_ticket(), cfg->output_cfg.security);
-	DISPFENCE("%s", msg);
+	if (n < 0) {
+		DISP_PR_INFO("[%s %d]snprintf err:%d\n",
+			     __func__, __LINE__, n);
+	} else
+		DISPFENCE("%s", msg);
 
 	mtkfb_update_buf_info(cfg->session_id,
 			      disp_sync_get_output_interface_timeline_id(),
@@ -1072,16 +1084,16 @@ long __frame_config(unsigned long arg)
 		goto error1;
 	}
 
+	if (disp_validate_ioctl_params(cfg)) {
+		ret = -EINVAL;
+		goto error1;
+	}
+
 	cfg->setter = SESSION_USER_HWC;
 
 	input_config_preprocess(cfg);
 	if (cfg->output_en)
 		output_config_preprocess(cfg);
-
-	if (disp_validate_ioctl_params(cfg)) {
-		ret = -EINVAL;
-		goto error2;
-	}
 
 	switch (DISP_SESSION_TYPE(cfg->session_id)) {
 	case DISP_SESSION_PRIMARY:
@@ -1099,7 +1111,6 @@ long __frame_config(unsigned long arg)
 		break;
 	}
 
-error2:
 	disp_input_free_dirty_roi(cfg);
 error1:
 	kfree(cfg);

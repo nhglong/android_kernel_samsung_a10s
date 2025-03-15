@@ -85,6 +85,20 @@ static struct stAF_OisPosInfo OisPosInfo;
 static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	{1, AFDRV_DW9718TAF, DW9718TAF_SetI2Cclient, DW9718TAF_Ioctl,
 	 DW9718TAF_Release, DW9718TAF_GetFileName, NULL},
+//+bug 612420,zhanghao2.wt,add,2020/12/24,add for n6 camera bring up
+    {1, AFDRV_GT9772AF, GT9772AF_SetI2Cclient, GT9772AF_Ioctl,
+     GT9772AF_Release, GT9772AF_GetFileName,NULL},
+    {1, AFDRV_JCT_GT9772AF, JCT_GT9772AF_SetI2Cclient, JCT_GT9772AF_Ioctl,
+     JCT_GT9772AF_Release, JCT_GT9772AF_GetFileName,NULL},
+//+bug 612420,zhanghao2.wt,add,2020/12/24,add for n6 camera bring up
+	//+bug 621775 liuxiangyin.wt, add, 2021/2/23, n21 1st supply main af TXD_S5K2P6_GT9769AF porting
+	{1, AFDRV_TXD_S5K2P6_GT9769AF, TXD_S5K2P6_GT9769AF_SetI2Cclient, TXD_S5K2P6_GT9769AF_Ioctl,
+	 TXD_S5K2P6_GT9769AF_Release, TXD_S5K2P6_GT9769AF_GetFileName, NULL},
+	//-bug 621775 liuxiangyin.wt, add, 2021/2/23, n21 1st supply main af TXD_S5K2P6_GT9769AF porting
+	//+bug 621775,lintaicheng.wt, add, 20210208, add for n21 AF bring up
+	{1, AFDRV_HLT_OV16B10_ZC535BAF, HLT_OV16B10_ZC535BAF_SetI2Cclient, HLT_OV16B10_ZC535BAF_Ioctl,
+	 HLT_OV16B10_ZC535BAF_Release, HLT_OV16B10_ZC535BAF_GetFileName, NULL},
+	//-bug 621775,lintaicheng.wt, add, 20210208, add for n21 AF bring up
 	{1, AFDRV_AK7371AF, AK7371AF_SetI2Cclient, AK7371AF_Ioctl,
 	 AK7371AF_Release, AK7371AF_GetFileName, NULL},
 	{1, AFDRV_BU6424AF, BU6424AF_SetI2Cclient, BU6424AF_Ioctl,
@@ -106,6 +120,12 @@ static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	},
 	{1, AFDRV_DW9714AF, DW9714AF_SetI2Cclient, DW9714AF_Ioctl,
 	 DW9714AF_Release, DW9714AF_GetFileName, NULL},
+	//+bug 612420,huangguoyong.wt,add,2020/12/25,add for n6 camera af
+	{1, AFDRV_ZC535AF, ZC535AF_SetI2Cclient, ZC535AF_Ioctl,
+	 ZC535AF_Release, ZC535AF_GetFileName,NULL},
+	{1, AFDRV_JCT_DW9714VAF, JCT_DW9714VAF_SetI2Cclient, JCT_DW9714VAF_Ioctl,
+	 JCT_DW9714VAF_Release, JCT_DW9714VAF_GetFileName, NULL},
+	//-bug 612420,huangguoyong.wt,add,2020/12/25,add for n6 camera af
 	{1, AFDRV_DW9718SAF, DW9718SAF_SetI2Cclient, DW9718SAF_Ioctl,
 	 DW9718SAF_Release, DW9718SAF_GetFileName, NULL},
 	{1, AFDRV_DW9719TAF, DW9719TAF_SetI2Cclient, DW9719TAF_Ioctl,
@@ -122,6 +142,10 @@ static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	 DW9839AF_Release, DW9839AF_GetFileName, NULL},
 	{1, AFDRV_FP5510E2AF, FP5510E2AF_SetI2Cclient, FP5510E2AF_Ioctl,
 	 FP5510E2AF_Release, FP5510E2AF_GetFileName, NULL},
+	{1, AFDRV_FP5519AF, FP5519AF_SetI2Cclient, FP5519AF_Ioctl,
+	 FP5519AF_Release, FP5519AF_GetFileName, NULL},
+	{1, AFDRV_FP5529AF, FP5529AF_SetI2Cclient, FP5529AF_Ioctl,
+	 FP5529AF_Release, FP5529AF_GetFileName, NULL},
 	{1, AFDRV_DW9718AF, DW9718AF_SetI2Cclient, DW9718AF_Ioctl,
 	 DW9718AF_Release, DW9718AF_GetFileName, NULL},
 	{1, AFDRV_GT9764AF, GT9764AF_SetI2Cclient, GT9764AF_Ioctl,

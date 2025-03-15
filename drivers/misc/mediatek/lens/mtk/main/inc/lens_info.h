@@ -11,8 +11,8 @@
 
 #include "lens_list.h"
 #include <linux/ioctl.h>
-
-#define MAX_NUM_OF_LENS 32
+//bug 621775 liuxiangyin.wt, add, 2021/2/23, n21 1st supply main af TXD_S5K2P6_GT9769AF porting
+#define MAX_NUM_OF_LENS 35
 
 #define AF_MAGIC 'A'
 
@@ -23,7 +23,16 @@
 #endif
 
 /* AFDRV_XXXX be the same as AF_DRVNAME in (*af).c */
+//+bug 612420,zhanghao2.wt,add,2020/12/24,add for n6 camera bring up
+#define AFDRV_GT9772AF "GT9772AF"
+#define AFDRV_JCT_GT9772AF "JCT_GT9772AF"
+
+//-bug 612420,zhanghao2.wt,add,2020/12/24,add for n6 camera bring up
 #define AFDRV_AD5820AF "AD5820AF"
+//bug 621775 liuxiangyin.wt, add, 2021/2/23, n21 1st supply main af TXD_S5K2P6_GT9769AF porting
+#define AFDRV_TXD_S5K2P6_GT9769AF "TXD_S5K2P6_GT9769AF"
+//bug 621775,lintaicheng.wt, add, 20210208, add for n21 AF bring up
+#define AFDRV_HLT_OV16B10_ZC535BAF "HLT_OV16B10_ZC535BAF"
 #define AFDRV_AD5823 "AD5823"
 #define AFDRV_AD5823AF "AD5823AF"
 #define AFDRV_AK7345AF "AK7345AF"
@@ -37,6 +46,10 @@
 #define AFDRV_BU64745GWZAF "BU64745GWZAF"
 #define AFDRV_DW9714A "DW9714A"
 #define AFDRV_DW9714AF "DW9714AF"
+//+bug 612420,huangguoyong.wt,add,2020/12/25,add for n6 camera af
+#define AFDRV_ZC535AF "ZC535AF"
+#define AFDRV_JCT_DW9714VAF "JCT_DW9714VAF"
+//-bug 612420,huangguoyong.wt,add,2020/12/25,add for n6 camera af
 #define AFDRV_DW9718AF "DW9718AF"
 #define AFDRV_DW9718SAF "DW9718SAF"
 #define AFDRV_DW9800WAF "DW9800WAF"
@@ -45,6 +58,8 @@
 #define AFDRV_DW9814AF "DW9814AF"
 #define AFDRV_DW9839AF "DW9839AF"
 #define AFDRV_FP5510E2AF "FP5510E2AF"
+#define AFDRV_FP5519AF "FP5519AF"
+#define AFDRV_FP5529AF "FP5529AF"
 #define AFDRV_FM50AF "FM50AF"
 #define AFDRV_GAF001AF "GAF001AF"
 #define AFDRV_GAF002AF "GAF002AF"

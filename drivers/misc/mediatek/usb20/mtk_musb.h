@@ -89,6 +89,9 @@ extern void musb_sync_with_bat(struct musb *musb, int usb_state);
 extern bool is_saving_mode(void);
 
 /* host and otg */
+extern void mt_usb_host_connect(int delay);
+extern void mt_usb_host_disconnect(int delay);
+extern void mt_otg_accessory_power(int is_on);
 extern void mt_usb_otg_init(struct musb *musb);
 extern void mt_usb_otg_exit(struct musb *musb);
 extern void mt_usb_init_drvvbus(void);

@@ -81,6 +81,44 @@ static void select_cv(struct mtk_charger *info)
 	info->setting.cv = constant_voltage;
 }
 
+static bool is_typec_adapter(struct mtk_charger *info)
+{
+	int rp;
+
+	rp = adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL);
+	if (info->pd_type == MTK_PD_CONNECT_TYPEC_ONLY_SNK &&
+			rp != 500 &&
+			info->chr_type != POWER_SUPPLY_TYPE_USB &&
+			info->chr_type != POWER_SUPPLY_TYPE_USB_CDP)
+		return true;
+
+	return false;
+}
+
+static bool support_fast_charging(struct mtk_charger *info)
+{
+	struct chg_alg_device *alg;
+	int i = 0, state = 0;
+	bool ret = false;
+
+	for (i = 0; i < MAX_ALG_NO; i++) {
+		alg = info->alg[i];
+		if (alg == NULL)
+			continue;
+
+		chg_alg_set_current_limit(alg, &info->setting);
+		state = chg_alg_is_algo_ready(alg);
+		chr_debug("%s %s ret:%s\n", __func__, dev_name(&alg->dev),
+			chg_alg_state_to_str(state));
+
+		if (state == ALG_READY || state == ALG_RUNNING) {
+			ret = true;
+			break;
+		}
+	}
+	return ret;
+}
+
 static bool select_charging_current_limit(struct mtk_charger *info,
 	struct chg_limit_setting *setting)
 {
@@ -117,29 +155,29 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 	}
 
 	if (info->atm_enabled == true
-		&& (info->chr_type == POWER_SUPPLY_USB_TYPE_SDP ||
-		info->chr_type == POWER_SUPPLY_USB_TYPE_CDP)
+		&& (info->chr_type == POWER_SUPPLY_TYPE_USB ||
+		info->chr_type == POWER_SUPPLY_TYPE_USB_CDP)
 		) {
 		pdata->input_current_limit = 100000; /* 100mA */
 		is_basic = true;
 		goto done;
 	}
 
-	if (info->chr_type == POWER_SUPPLY_USB_TYPE_SDP) {
+	if (info->chr_type == POWER_SUPPLY_TYPE_USB) {
 		pdata->input_current_limit =
 				info->data.usb_charger_current;
 		/* it can be larger */
 		pdata->charging_current_limit =
 				info->data.usb_charger_current;
 		is_basic = true;
-	} else if (info->chr_type == POWER_SUPPLY_USB_TYPE_CDP) {
+	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_CDP) {
 		pdata->input_current_limit =
 			info->data.charging_host_charger_current;
 		pdata->charging_current_limit =
 			info->data.charging_host_charger_current;
 		is_basic = true;
 
-	} else if (info->chr_type == POWER_SUPPLY_USB_TYPE_DCP) {
+	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_DCP) {
 		pdata->input_current_limit =
 			info->data.ac_charger_input_current;
 		pdata->charging_current_limit =
@@ -149,17 +187,45 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 				pdata->input_current_limit;
 			pdata2->charging_current_limit = 2000000;
 		}
+	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_FLOAT) {
+		/* NONSTANDARD_CHARGER */
+		pdata->input_current_limit =
+			info->data.usb_charger_current;
+		pdata->charging_current_limit =
+			info->data.usb_charger_current;
+		is_basic = true;
 	}
-
+#ifndef CONFIG_MTK_DISABLE_TEMP_PROTECT
 	if (info->enable_sw_jeita) {
 		if (IS_ENABLED(CONFIG_USBIF_COMPLIANCE)
-			&& info->chr_type == POWER_SUPPLY_USB_TYPE_SDP)
+			&& info->chr_type == POWER_SUPPLY_TYPE_USB)
 			chr_debug("USBIF & STAND_HOST skip current check\n");
 		else {
+//+bug 621775,yaocankun.wt,mod,20210121,mod for n21 jeita config
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+			if (info->sw_jeita.sm != TEMP_T2_TO_T3) {
+				//info->setting only use for hvdcp charger
+				//pdata->charging_current_limit only use for normal dcp and must lower than dcp
+				if (pdata->charging_current_limit > info->sw_jeita.cc)
+				{
+					pdata->charging_current_limit = info->sw_jeita.cc;
+				}
+				info->setting.charging_current_limit1 = info->sw_jeita.cc;
+			}else{
+				info->setting.charging_current_limit1 = -1;
+			}
+			info->enable_hv_charging = true;
+#elif CONFIG_CHARGER_BQ2415X
+			if (info->sw_jeita.cc != 0) {
+				pdata->charging_current_limit = info->sw_jeita.cc;
+			}
+#else
 			if (info->sw_jeita.sm == TEMP_T0_TO_T1) {
 				pdata->input_current_limit = 500000;
 				pdata->charging_current_limit = 350000;
 			}
+#endif
+//-bug 621775,yaocankun.wt,mod,20210121,mod for n21 jeita config
 		}
 	}
 
@@ -172,7 +238,55 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 					pdata->thermal_charging_current_limit;
 		}
 	} else
+
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+	{
+		if ((!info->enable_sw_jeita) || (IS_ENABLED(CONFIG_USBIF_COMPLIANCE))) {
+			info->setting.charging_current_limit1 = -1;
+		}
+	}
+//+bug 621775,yaocankun.wt,mod,20210121,charge current limit for AP overheat
+	if((info->bootmode != 8) &&  //KERNEL_POWER_OFF_CHARGING_BOOT
+		(info->bootmode != 9)) {    //LOW_POWER_OFF_CHARGING_BOOT
+		if(info->lcmoff) {
+			if(info->ap_thermal_lcmoff.cc < pdata->charging_current_limit)
+			{
+				pdata->charging_current_limit = info->ap_thermal_lcmoff.cc;
+			}
+
+			if(info->setting.charging_current_limit1 == -1)		//battery temp normal
+			{
+				info->setting.charging_current_limit1 = info->ap_thermal_lcmoff.cc;
+			}else if(info->setting.charging_current_limit1 > info->ap_thermal_lcmoff.cc)
+			{
+				info->setting.charging_current_limit1 = info->ap_thermal_lcmoff.cc;
+			}
+
+		} else {
+			if(info->ap_thermal_lcmon.cc < pdata->charging_current_limit)
+			{
+				pdata->charging_current_limit = info->ap_thermal_lcmon.cc;
+			}
+
+			if(info->setting.charging_current_limit1 == -1)		//battery temp normal
+			{
+				info->setting.charging_current_limit1 = info->ap_thermal_lcmon.cc;
+			}else if(info->setting.charging_current_limit1 > info->ap_thermal_lcmon.cc)
+			{
+				info->setting.charging_current_limit1 = info->ap_thermal_lcmon.cc;
+			}
+		}
+	}
+//-bug 621775,yaocankun.wt,mod,20210121,charge current limit for AP overheat
+#elif CONFIG_CHARGER_BQ2415X
+	if(info->ap_thermal_lcmoff.cc < pdata->charging_current_limit){
+				pdata->charging_current_limit = info->ap_thermal_lcmoff.cc;
+				chr_err("[AP_THERMAL] AP below Temperature(%d) !!\n",
+				pdata->charging_current_limit);
+	}
+#else
 		info->setting.charging_current_limit1 = -1;
+#endif
 
 	if (pdata->thermal_input_current_limit != -1) {
 		if (pdata->thermal_input_current_limit <
@@ -182,7 +296,8 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 			info->setting.input_current_limit1 =
 					pdata->input_current_limit;
 		}
-	} else
+	}
+	else
 		info->setting.input_current_limit1 = -1;
 
 	if (pdata2->thermal_charging_current_limit != -1) {
@@ -207,27 +322,93 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 	} else
 		info->setting.input_current_limit2 = -1;
 
-	if (info->pd_type == MTK_PD_CONNECT_PE_READY_SNK ||
-		info->pd_type == MTK_PD_CONNECT_PE_READY_SNK_PD30 ||
-		info->pd_type == MTK_PD_CONNECT_PE_READY_SNK_APDO)
+	if (info->setting.input_current_limit1 == -1 &&
+		info->setting.input_current_limit2 == -1 &&
+		info->setting.charging_current_limit1 == -1 &&
+		info->setting.charging_current_limit2 == -1)
+		info->enable_hv_charging = true;
+#endif
+	if (support_fast_charging(info))
 		is_basic = false;
+	else {
+		is_basic = true;
+		/* AICL */
+		charger_dev_run_aicl(info->chg1_dev,
+			&pdata->input_current_limit_by_aicl);
+		if (info->enable_dynamic_mivr) {
+			if (pdata->input_current_limit_by_aicl >
+				info->data.max_dmivr_charger_current)
+				pdata->input_current_limit_by_aicl =
+					info->data.max_dmivr_charger_current;
+		}
+		if (is_typec_adapter(info)) {
+			if (adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL)
+				== 3000) {
+				pdata->input_current_limit = 3000000;
+				pdata->charging_current_limit = 3000000;
+			} else if (adapter_dev_get_property(info->pd_adapter,
+				TYPEC_RP_LEVEL) == 1500) {
+				pdata->input_current_limit = 1500000;
+				pdata->charging_current_limit = 2000000;
+			} else {
+				chr_err("type-C: inquire rp error\n");
+				pdata->input_current_limit = 500000;
+				pdata->charging_current_limit = 500000;
+			}
 
+			chr_err("type-C:%d current:%d\n",
+				info->pd_type,
+				adapter_dev_get_property(info->pd_adapter,
+					TYPEC_RP_LEVEL));
+		}
+	}
+
+	if (is_basic == true && pdata->input_current_limit_by_aicl != -1) {
+		if (pdata->input_current_limit_by_aicl <
+		    pdata->input_current_limit)
+			pdata->input_current_limit =
+					pdata->input_current_limit_by_aicl;
+	}
 done:
 
 	ret = charger_dev_get_min_charging_current(info->chg1_dev, &ichg1_min);
 	if (ret != -ENOTSUPP && pdata->charging_current_limit < ichg1_min) {
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+		chr_err("min_charging_current is too low %d ,limit at %d\n",
+			pdata->charging_current_limit, ichg1_min);
+		pdata->charging_current_limit = ichg1_min;
+		is_basic = true;
+		info->enable_hv_charging = false;
+#elif CONFIG_CHARGER_BQ2415X
+		chr_err("min_charging_current is too low %d %d\n",
+			pdata->charging_current_limit, ichg1_min);
+		pdata->charging_current_limit = ichg1_min;
+		is_basic = true;
+		info->enable_hv_charging = false;
+#else
 		pdata->charging_current_limit = 0;
 		chr_err("min_charging_current is too low %d %d\n",
 			pdata->charging_current_limit, ichg1_min);
 		is_basic = true;
+		info->enable_hv_charging = false;
+#endif
 	}
 
 	ret = charger_dev_get_min_input_current(info->chg1_dev, &aicr1_min);
 	if (ret != -ENOTSUPP && pdata->input_current_limit < aicr1_min) {
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+		chr_err("min_input_current is too low %d ,limit at %d\n",
+			pdata->input_current_limit, aicr1_min);
+		pdata->input_current_limit = aicr1_min;
+		is_basic = true;
+		info->enable_hv_charging = false;
+#else
 		pdata->input_current_limit = 0;
 		chr_err("min_input_current is too low %d %d\n",
 			pdata->input_current_limit, aicr1_min);
 		is_basic = true;
+		info->enable_hv_charging = false;
+#endif
 	}
 
 	chr_err("m:%d chg1:%d,%d,%d,%d chg2:%d,%d,%d,%d type:%d:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d bm:%d b:%d\n",
@@ -248,6 +429,33 @@ done:
 
 	return is_basic;
 }
+#ifdef CONFIG_MT6370_PMU_CHARGER
+static int wt_retrigger_full_status(struct mtk_charger *info, bool chg_done)
+{
+	static bool retrigger_full = false;
+
+	if((get_uisoc(info) < 100)
+		&& chg_done)
+	{
+		retrigger_full = true;
+		chr_err("%s ready to retrigger until soc ready 100\n", __func__);
+	}
+	else if((get_uisoc(info) == 100)
+		&& chg_done
+		&& retrigger_full)
+	{
+		charger_dev_do_event(info->chg1_dev, EVENT_FULL, 0);
+		chr_err("%s retrigger battery full\n", __func__);
+		retrigger_full = false;
+	}
+	else
+	{
+		retrigger_full = false;
+//		chr_err("%s yck battery full\n", __func__);
+	}
+	return 0;
+}
+#endif
 
 static int do_algorithm(struct mtk_charger *info)
 {
@@ -273,6 +481,9 @@ static int do_algorithm(struct mtk_charger *info)
 			chr_err("%s battery recharge\n", __func__);
 		}
 	}
+#ifdef CONFIG_MT6370_PMU_CHARGER
+	wt_retrigger_full_status(info, chg_done);
+#endif
 
 	chr_err("%s is_basic:%d\n", __func__, is_basic);
 	if (is_basic != true) {
@@ -281,8 +492,14 @@ static int do_algorithm(struct mtk_charger *info)
 			alg = info->alg[i];
 			if (alg == NULL)
 				continue;
-
-			if (!info->enable_hv_charging) {
+//+Bug 623299, yaocankun.wt, add, 20210219, add battery hv disable
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+			if ((!info->enable_hv_charging) || (batt_hv_disable))
+#else
+			if (!info->enable_hv_charging)
+#endif
+//-Bug 623299, yaocankun.wt, add, 20210219, add battery hv disable
+			{
 				chg_alg_get_prop(alg, ALG_MAX_VBUS, &val);
 				if (val > 5000)
 					chg_alg_stop_algo(alg);
@@ -321,7 +538,18 @@ static int do_algorithm(struct mtk_charger *info)
 			} else if (ret == ALG_READY || ret == ALG_RUNNING) {
 				is_basic = false;
 				//chg_alg_set_setting(alg, &info->setting);
+//+bug 623282,yaocankun.wt,add,20210127,add pd charger support
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+				ret = chg_alg_start_algo(alg);
+				if (ret == ALG_TA_NOT_SUPPORT) {
+					/* not expect charger, check another quickly */
+					is_basic = true;
+					continue;
+				}
+#else
 				chg_alg_start_algo(alg);
+#endif
+//+bug 623282,yaocankun.wt,add,20210127,add pd charger support
 				break;
 			} else {
 				chr_err("algorithm ret is error");

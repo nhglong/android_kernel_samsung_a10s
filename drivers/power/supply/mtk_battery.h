@@ -23,6 +23,7 @@
 #define UNIT_TRANS_1000	1000
 #define UNIT_TRANS_60	60
 #define MAX_TABLE		10
+#define MAX_BAT_NUM     3
 
 #define BMLOG_ERROR_LEVEL   3
 #define BMLOG_WARNING_LEVEL 4
@@ -96,6 +97,11 @@ do {\
 	.prop	= _prop,	\
 	.set	= _name##_set,						\
 }
+
+struct bat_id_vol_range {
+	int low;
+	int high;
+};
 
 enum battery_property {
 	BAT_PROP_TEMPERATURE,
@@ -732,7 +738,7 @@ struct simulator_log {
 #define SHUTDOWN_TIME 40
 #define AVGVBAT_ARRAY_SIZE 30
 #define INIT_VOLTAGE 3450
-#define BATTERY_SHUTDOWN_TEMPERATURE 60
+#define BATTERY_SHUTDOWN_TEMPERATURE 68 //bug 621775,yaocankun.wt,mod,20210121,mod for 68 degree trigger shutdown
 
 struct shutdown_condition {
 	bool is_overheat;
@@ -796,6 +802,12 @@ struct mtk_battery {
 	struct sock *mtk_battery_sk;
 
 	struct mtk_battery_algo algo;
+
+#if defined (CONFIG_CHARGER_BQ2415X) || defined (CONFIG_WT_PROJECT_S96717RA1)
+	struct power_supply	*cw_battery_psy;
+	int			*batt_cycle_fv_cfg;
+	int			fv_levels;
+#endif 
 
 	u_int fgd_pid;
 
@@ -928,6 +940,7 @@ struct mtk_battery {
 
 	/*custom related*/
 	int battery_id;
+	int battery_id_vol;
 	struct fuel_gauge_custom_data fg_cust_data;
 	struct fuel_gauge_table_custom_data fg_table_cust_data;
 	struct fgd_cmd_param_t_custom fg_data;
@@ -1014,5 +1027,18 @@ extern void battery_algo_init(struct mtk_battery *gm);
 extern void do_fg_algo(struct mtk_battery *gm, unsigned int intr_num);
 extern void fg_bat_temp_int_internal(struct mtk_battery *gm);
 /* mtk_battery_algo.c end */
+
+extern signed int battery_get_debug_uisoc(void);//bug 615299,xuejizhou.wt,ADD,20201228, battery SOC limitation for store mode
+//+Bug 615302,xuejizhou.wt,ADD,20210113,battery Current event and slate mode
+#ifdef CONFIG_CHARGER_BQ2415X
+extern struct atomic_notifier_head charger_notifier;
+extern int register_mtk_battery_notifier(struct notifier_block *nb);
+extern void unre_mtk_battery_notifier(struct notifier_block *nb);
+extern int wt_set_batt_cycle_fv(void);
+#endif
+//-Bug 615302,xuejizhou.wt,ADD,20210113,battery Current event and slate mode
+#ifdef CONFIG_WT_PROJECT_S96717RA1
+extern int wt_set_batt_cycle_fv(void);
+#endif
 
 #endif /* __MTK_BATTERY_INTF_H__ */

@@ -38,6 +38,9 @@
 #include "mtk_sched_mon.h"
 #endif
 #include <mt-plat/mboot_params.h>
+#ifdef CONFIG_SEC_DEBUG
+#include <linux/sec_debug.h>
+#endif
 
 #define THREAD_INFO(sp) ((struct thread_info *) \
 				((unsigned long)(sp) & ~(THREAD_SIZE - 1)))
@@ -252,7 +255,9 @@ void aee_wdt_atf_info(unsigned int cpu, struct pt_regs *regs)
 	int res = 0;
 	struct wd_api *wd_api = NULL;
 #endif
-
+#ifdef CONFIG_SEC_DEBUG
+	sec_save_context(cpu, regs);
+#endif
 	if (!cpu_possible(cpu)) {
 		aee_wdt_printf("FIQ: Watchdog time out at incorrect CPU %d ?\n",
 				cpu);
@@ -296,6 +301,12 @@ void aee_wdt_atf_info(unsigned int cpu, struct pt_regs *regs)
 		aee_wdt_printf("\nkick=0x%08x,check=0x%08x",
 				wd_api->wd_get_kick_bit(),
 				wd_api->wd_get_check_bit());
+		
+#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
+		sec_debug_set_extra_info_wdt_lastpc(wdt_percpu_stackframe,
+				wd_api->wd_get_kick_bit(),
+				wd_api->wd_get_check_bit());
+#endif
 	}
 #else
 	aee_wdt_printf("\n mtk watchdog not enable\n");
@@ -343,10 +354,14 @@ void aee_wdt_atf_info(unsigned int cpu, struct pt_regs *regs)
 
 	dump_emi_outstanding();
 
-	if (aee_rr_curr_exp_type() == AEE_EXP_TYPE_HWT)
+	if (aee_rr_curr_exp_type() == AEE_EXP_TYPE_HWT) {
+#ifdef CONFIG_SEC_DEBUG
+		sec_upload_cause("Watchdog");
+#endif		
 		mrdump_common_die(AEE_FIQ_STEP_WDT_IRQ_DONE,
 				  AEE_REBOOT_MODE_WDT,
 				  "WDT/HWT", regs);
+	}
 	else
 		mrdump_common_die(AEE_FIQ_STEP_WDT_IRQ_DONE,
 				  AEE_REBOOT_MODE_MRDUMP_KEY,

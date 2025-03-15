@@ -150,7 +150,10 @@ static int mtk_usb_extcon_psy_init(struct mtk_extcon_info *extcon)
 	int ret = 0;
 	struct device *dev = extcon->dev;
 
-	extcon->usb_psy = devm_power_supply_get_by_phandle(dev, "charger");
+	if (extcon->usb_psy == NULL) {
+		extcon->usb_psy = devm_power_supply_get_by_phandle(dev, "charger");
+		dev_info(dev, "%s devm_power_supply_get_by_phandle %d\n", __func__, sizeof(extcon->usb_psy));
+	}
 	if (IS_ERR_OR_NULL(extcon->usb_psy)) {
 		dev_err(dev, "fail to get usb_psy\n");
 		return -EINVAL;

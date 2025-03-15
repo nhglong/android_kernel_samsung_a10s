@@ -133,6 +133,7 @@ static bool g_pwm_first_config[PWM_TOTAL_MODULE_NUM];
 #endif		/* PWM_USE_HIGH_ULPOSC_FQ */
 #endif		/* CONFIG_FPGA_EARLY_PORTING */
 static int g_pwm_log_num = PWM_LOG_BUFFER_SIZE;
+extern unsigned int g_default_panel_backlight_off;
 
 int disp_pwm_get_cust_led(unsigned int *clocksource, unsigned int *clockdiv)
 {
@@ -241,11 +242,11 @@ static void disp_pwm_query_backlight(char *debug_output)
 
 	if (high_width > 0) {
 		/* print backlight status */
-		scnprintf(temp_buf, buf_max_len,
+		snprintf(temp_buf, buf_max_len,
 			"backlight is on (%d), ddp_pwm power:(%d)",
 			high_width, atomic_read(&g_pwm_is_power_on[index]));
 	} else {
-		scnprintf(temp_buf, buf_max_len,
+		snprintf(temp_buf, buf_max_len,
 			"backlight is off, ddp_pwm power:(%d)",
 			atomic_read(&g_pwm_is_power_on[index]));
 	}
@@ -456,14 +457,10 @@ static void disp_pwm_log(int level_1024, int log_type)
 	print_log = 0;
 
 	if (g_pwm_log_index >= g_pwm_log_num || level_1024 == 0) {
-		scnprintf(buffer + strlen(buffer),
-			sizeof(buffer) - strlen(buffer),
-			"(latest=%2u): ",
+		sprintf(buffer + strlen(buffer), "(latest=%2u): ",
 			g_pwm_log_index);
 		for (i = 0; i < g_pwm_log_index; i += 1) {
-			scnprintf(buffer + strlen(buffer),
-				sizeof(buffer) - strlen(buffer),
-				"%5d(%4lu,%4lu)",
+			sprintf(buffer + strlen(buffer), "%5d(%4lu,%4lu)",
 				g_pwm_log_buffer[i].value,
 				g_pwm_log_buffer[i].tsec,
 				g_pwm_log_buffer[i].tusec);
@@ -554,6 +551,7 @@ int disp_pwm_set_backlight(enum disp_pwm_id_t id, int level_1024)
 	return 0;
 }
 
+
 int disp_pwm_set_backlight_cmdq(enum disp_pwm_id_t id,
 	int level_1024, void *cmdq)
 {
@@ -600,12 +598,11 @@ int disp_pwm_set_backlight_cmdq(enum disp_pwm_id_t id,
 		level_1024 = disp_pwm_level_remap(id, level_1024);
 
 		reg_base = pwm_get_reg_base(id);
-
+	
 		if (level_1024 > 0) {
 			DISP_REG_MASK(cmdq, reg_base + DISP_PWM_CON_1_OFF,
 				level_1024 << 16, 0x1fff << 16);
-
-			disp_pwm_set_enabled(cmdq, id, 1);
+				disp_pwm_set_enabled(cmdq, id, 1);
 		} else {
 			/* Avoid to set 0 */
 			DISP_REG_MASK(cmdq, reg_base + DISP_PWM_CON_1_OFF,
@@ -742,10 +739,16 @@ static int ddp_pwm_power_off(enum DISP_MODULE_ENUM module, void *handle)
 static int ddp_pwm_init(enum DISP_MODULE_ENUM module, void *cmq_handle)
 {
 #if !defined(CONFIG_MACH_MT6759) && !defined(CONFIG_MACH_MT6739)
-	ddp_pwm_power_on(module, cmq_handle);
+	//+Chk 80142, chensibo.wt, ADD, 20210128, no panel insert to close backlight
+	if(g_default_panel_backlight_off)
+		ddp_pwm_power_off(module, cmq_handle);
+	else
+		ddp_pwm_power_on(module, cmq_handle);
+	//-Chk 80142, chensibo.wt, ADD, 20210128, no panel insert to close backlight
 #endif
 	return 0;
 }
+
 
 static int ddp_pwm_set_listener(enum DISP_MODULE_ENUM module,
 	ddp_module_notify notify)

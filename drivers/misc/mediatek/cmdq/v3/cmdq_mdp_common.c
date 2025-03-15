@@ -709,6 +709,11 @@ static void cmdq_mdp_lock_thread(struct cmdqRecStruct *handle)
 	/* make this thread can be dispath again */
 	mdp_ctx.thread[thread].allow_dispatch = true;
 	mdp_ctx.thread[thread].task_count++;
+	if (mdp_ctx.thread[thread].task_count > 3) {
+		CMDQ_LOG("[WARN]thread %d, task_count %d, engine:0x%llx\n",
+			thread, mdp_ctx.thread[thread].task_count,
+			mdp_ctx.thread[thread].engine_flag);
+	}
 
 	CMDQ_PROF_END(current->pid, __func__);
 }
@@ -957,12 +962,19 @@ static s32 cmdq_mdp_consume_handle(void)
 	bool acquired = false;
 	struct CmdqCBkStruct *callback = cmdq_core_get_group_cb();
 	bool force_inorder = false;
+	bool conflict = false;
+	bool secure_run = false;
 
 	/* operation for tasks_wait list need task mutex */
 	mutex_lock(&mdp_task_mutex);
 
 	CMDQ_PROF_MMP(cmdq_mmp_get_event()->consume_done, MMPROFILE_FLAG_START,
 		current->pid, 0);
+
+	handle = list_first_entry_or_null(&mdp_ctx.tasks_wait, typeof(*handle),
+		list_entry);
+	if (handle)
+		secure_run = handle->secData.is_secure;
 
 	/* loop waiting list for pending handles */
 	list_for_each_entry_safe(handle, temp, &mdp_ctx.tasks_wait,
@@ -978,6 +990,14 @@ static s32 cmdq_mdp_consume_handle(void)
 			continue;
 		}
 
+		if (secure_run != handle->secData.is_secure) {
+			mutex_unlock(&mdp_thread_mutex);
+			CMDQ_LOG(
+				"skip secure inorder handle:%p engine:%#llx\n",
+				handle, handle->engineFlag);
+			break;
+		}
+
 		handle->thread = cmdq_mdp_find_free_thread(handle);
 		if (handle->thread == CMDQ_INVALID_THREAD) {
 			/* no available thread, keep wait */
@@ -991,6 +1011,7 @@ static s32 cmdq_mdp_consume_handle(void)
 			CMDQ_MSG(
 				"fail to get thread handle:0x%p engine:0x%llx\n",
 				handle, handle->engineFlag);
+			conflict = true;
 			continue;
 		}
 
@@ -1041,6 +1062,8 @@ static s32 cmdq_mdp_consume_handle(void)
 		current->pid, 0);
 
 	mutex_unlock(&mdp_task_mutex);
+	if (conflict)
+		cmdq_core_dump_active();
 
 	if (acquired) {
 		/* notify some task's SW thread to change their waiting state.
@@ -1226,13 +1249,6 @@ s32 cmdq_mdp_handle_sec_setup(struct cmdqSecDataStruct *secData,
 
 	if (!secData || !secData->is_secure)
 		return 0;
-
-#ifdef CMDQ_SECURE_MTEE_SUPPORT
-	if (handle->engineFlag & CMDQ_ENG_MTEE_GROUP_BITS)
-		cmdq_task_set_mtee(handle, true);
-	else
-		cmdq_task_set_mtee(handle, false);
-#endif	//CMDQ_SECURE_MTEE_SUPPORT
 
 	cmdq_task_set_secure(handle, secData->is_secure);
 	handle->secData.enginesNeedDAPC = secData->enginesNeedDAPC;
@@ -3809,18 +3825,18 @@ const char *cmdq_mdp_parse_handle_error_module_by_hwflag(
 #include "mdp_base.h"
 u32 cmdq_mdp_get_hw_reg(enum MDP_ENG_BASE base, u16 offset)
 {
-	if (offset > 0x1000) {
+	if (unlikely(offset > 0x1000)) {
 		CMDQ_ERR("%s: invalid offset:%#x\n", __func__, offset);
 		return 0;
 	}
 	offset &= ~0x3;
-	if (base >= ENGBASE_COUNT) {
+	if (unlikely(base >= ENGBASE_COUNT)) {
 		CMDQ_ERR("%s: invalid engine:%u, offset:%#x\n",
 			__func__, base, offset);
 		return 0;
 	}
-	if (mdp_base[base] == cmdq_dev_get_module_base_PA_GCE() &&
-		offset != 0x90) {
+	if (unlikely(mdp_base[base] == cmdq_dev_get_module_base_PA_GCE() &&
+		offset != 0x90)) {
 		CMDQ_ERR("%s: invalid engine:%u, offset:%#x\n",
 			__func__, base, offset);
 		return 0;
@@ -3830,7 +3846,7 @@ u32 cmdq_mdp_get_hw_reg(enum MDP_ENG_BASE base, u16 offset)
 
 u32 cmdq_mdp_get_hw_port(enum MDP_ENG_BASE base)
 {
-	if (base >= ENGBASE_COUNT) {
+	if (unlikely(base >= ENGBASE_COUNT)) {
 		CMDQ_ERR("%s: invalid engine:%u\n", __func__, base);
 		return 0;
 	}

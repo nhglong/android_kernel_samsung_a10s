@@ -6,9 +6,9 @@
 #include "regulator.h"
 //#include "upmu_common.h"
 
-#ifndef NO_OC
+
 #include <mt-plat/aee.h>
-#endif
+
 
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
@@ -16,15 +16,27 @@
 #include <linux/regulator/consumer.h>
 #include <linux/sched/signal.h>
 
+static struct REGULATOR *preg_own;
+static bool Is_Notify_call[IMGSENSOR_SENSOR_IDX_MAX_NUM][REGULATOR_TYPE_MAX_NUM];
+
 struct reg_oc_debug_t {
 	const char *name;
 	struct notifier_block nb;
+	struct regulator *regulator;
+	struct work_struct work;
 	unsigned int times;
 	unsigned int md_reg_idx;
 	bool is_md_reg;
 };
 
-static struct reg_oc_debug_t reg_oc_debug[REGULATOR_TYPE_MAX_NUM];
+//+bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
+static struct reg_oc_debug_t reg_oc_debug[IMGSENSOR_SENSOR_IDX_MAX_NUM][REGULATOR_TYPE_MAX_NUM];
+static int regulator_status[IMGSENSOR_SENSOR_IDX_MAX_NUM][REGULATOR_TYPE_MAX_NUM] = {0}; //Alex add for bokeh crash on regulator_set
+static void check_for_regulator_get(struct REGULATOR *preg, struct device *pdevice, enum IMGSENSOR_SENSOR_IDX sensor_idx, int index);
+static void check_for_regulator_put(struct REGULATOR *preg, enum IMGSENSOR_SENSOR_IDX sensor_idx, int index);
+static struct device_node *of_node_record = NULL;
+static DEFINE_MUTEX(g_regulator_state_mutex);
+//-bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
 
 static const int regulator_voltage[] = {
 	REGULATOR_VOLTAGE_0,
@@ -44,6 +56,8 @@ struct REGULATOR_CTRL regulator_control[REGULATOR_TYPE_MAX_NUM] = {
 	{"vcama"},
 	{"vcamd"},
 	{"vcamio"},
+	{"vcamaf"},//bug 612420,huangguoyong.wt,add,2021/01/04,add for s5k3l6 camera afvdd
+	//{"vldo28"},	//N6 Q camera bringup temp removed by yangzheng
 };
 
 static struct REGULATOR reg_instance;
@@ -58,7 +72,8 @@ static int regulator_oc_notify(
 			return NOTIFY_OK;
 
 		/* Do OC handling */
-		pr_info("notify regulator: %s OC\n", reg_oc_dbg->name);
+		pr_info("Imgsensor OC notify regulator: %s OC pid %ld\n",
+			reg_oc_dbg->name, (long)reg_instance.pid);
 
 		gimgsensor.status.oc = 1;
 		aee_kernel_warning("Imgsensor OC", "Over current");
@@ -75,46 +90,53 @@ static int regulator_oc_notify(
 enum IMGSENSOR_RETURN imgsensor_oc_interrupt(
 	enum IMGSENSOR_SENSOR_IDX sensor_idx, bool enable)
 {
-	struct regulator *preg = NULL;
+        //+bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
 	struct device *pdevice = gimgsensor_device;
-	char str_regulator_name[LENGTH_FOR_SNPRINTF];
 	int i = 0;
-#ifndef NO_OC
+	struct device_node       *pof_node;
 	int ret = 0;
-#endif
-	gimgsensor.status.oc = 0;
+
+	mutex_lock(&oc_mutex);
+	pr_debug("[regulator] %s idx=%d %s enable=%d\n",
+					__func__,
+					sensor_idx,
+					regulator_control[i].pregulator_type,
+					enable);
+
+	pof_node = pdevice->of_node;
+	pdevice->of_node =
+		of_find_compatible_node(NULL, NULL, "mediatek,camera_hw");
+	pr_debug("[regulator] %s pdevice->of_node=%p\n", __func__, pdevice->of_node);
 
 	if (enable) {
 		mdelay(5);
 		for (i = 0; i < REGULATOR_TYPE_MAX_NUM; i++) {
-			snprintf(str_regulator_name,
-					sizeof(str_regulator_name),
-					"cam%d_%s",
-					sensor_idx,
-					regulator_control[i].pregulator_type);
-			preg = regulator_get_optional(
-					pdevice, str_regulator_name);
-			if (IS_ERR(preg))
-				preg = NULL;
-			if (preg && regulator_is_enabled(preg)) {
+			if (preg_own->pregulator[sensor_idx][i] &&
+					regulator_is_enabled(preg_own->pregulator[sensor_idx][i]) &&
+					!Is_Notify_call[sensor_idx][i]
+				) {
 				/* oc notifier callback function */
-				reg_oc_debug[i].nb.notifier_call =
-				regulator_oc_notify;
-#ifndef NO_OC
-			ret = devm_regulator_register_notifier(preg,
-				&reg_oc_debug[i].nb);
+				reg_oc_debug[sensor_idx][i].name =
+					regulator_control[i].pregulator_type;
+				reg_oc_debug[sensor_idx][i].regulator =
+					preg_own->pregulator[sensor_idx][i];
+				reg_oc_debug[sensor_idx][i].nb.notifier_call =
+					regulator_oc_notify;
+				ret = devm_regulator_register_notifier(
+					preg_own->pregulator[sensor_idx][i],
+					&reg_oc_debug[sensor_idx][i].nb);
+				Is_Notify_call[sensor_idx][i] = true;
 
-			if (ret) {
-				pr_info(
-				"regulator notifier request error\n");
-			}
-#endif
-			pr_debug(
-				"[regulator] %s idx=%d %s enable=%d\n",
-				__func__,
-				sensor_idx,
-				regulator_control[i].pregulator_type,
-				enable);
+				if (ret) {
+					pr_info(
+					"regulator notifier request error\n");
+				}
+				pr_debug(
+					"[regulator] %s idx=%d %s enable=%d oc enabled\n",
+					__func__,
+					sensor_idx,
+					regulator_control[i].pregulator_type,
+					enable);
 			}
 		}
 		rcu_read_lock();
@@ -123,28 +145,25 @@ enum IMGSENSOR_RETURN imgsensor_oc_interrupt(
 	} else {
 		reg_instance.pid = -1;
 		/* Disable interrupt before power off */
-		pr_debug("Unregister OC notifier");
+
 		for (i = 0; i < REGULATOR_TYPE_MAX_NUM; i++) {
-			snprintf(str_regulator_name,
-					sizeof(str_regulator_name),
-					"cam%d_%s",
-					sensor_idx,
-					regulator_control[i].pregulator_type);
-			preg = regulator_get_optional(
-					pdevice, str_regulator_name);
-			if (IS_ERR(preg))
-				preg = NULL;
-#ifndef NO_OC
-			if (preg) {
+			if (preg_own->pregulator[sensor_idx][i] &&
+				regulator_is_enabled(preg_own->pregulator[sensor_idx][i]) &&
+				Is_Notify_call[sensor_idx][i]
+				) {
 				/* oc notifier callback function */
-				devm_regulator_unregister_notifier(preg,
-				&reg_oc_debug[i].nb);
+				devm_regulator_unregister_notifier(
+					preg_own->pregulator[sensor_idx][i],
+					&reg_oc_debug[sensor_idx][i].nb);
+				Is_Notify_call[sensor_idx][i] = false;
+				pr_info("Unregister OC notifier");
 			}
-#endif
 		}
 
 	}
-
+	mutex_unlock(&oc_mutex);
+	pdevice->of_node = pof_node;
+	//-bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
 	return IMGSENSOR_RETURN_SUCCESS;
 }
 
@@ -179,6 +198,9 @@ static enum IMGSENSOR_RETURN regulator_init(void *pinstance)
 		return IMGSENSOR_RETURN_ERROR;
 	}
 
+	//bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
+	of_node_record = pdevice->of_node;
+
 	for (j = IMGSENSOR_SENSOR_IDX_MIN_NUM;
 		j < IMGSENSOR_SENSOR_IDX_MAX_NUM;
 		j++) {
@@ -198,12 +220,13 @@ static enum IMGSENSOR_RETURN regulator_init(void *pinstance)
 					j, i, str_regulator_name);
 
 			atomic_set(&preg->enable_cnt[j][i], 0);
+			//bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
+			regulator_status[j][i] = 1; //Alex add for bokeh crash on regulator_set
 		}
 	}
 	pdevice->of_node = pof_node;
-#ifndef NO_OC
 	imgsensor_oc_init();
-#endif
+	preg_own = (struct REGULATOR *)pinstance;
 	return IMGSENSOR_RETURN_SUCCESS;
 }
 static enum IMGSENSOR_RETURN regulator_release(void *pinstance)
@@ -242,14 +265,18 @@ static enum IMGSENSOR_RETURN regulator_set(
 	int reg_type_offset;
 	atomic_t             *enable_cnt;
 
-
-	if (pin > IMGSENSOR_HW_PIN_DOVDD   ||
-		pin < IMGSENSOR_HW_PIN_AVDD    ||
-		pin_state < IMGSENSOR_HW_PIN_STATE_LEVEL_0 ||
-		pin_state >= IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH)
+	if (pin > IMGSENSOR_HW_PIN_AFVDD   ||//bug 612420,huangguoyong.wt,add,2020/12/23,add for n6 camera bring up
+	    pin < IMGSENSOR_HW_PIN_AVDD    ||
+	    pin_state < IMGSENSOR_HW_PIN_STATE_LEVEL_0 ||
+	    pin_state >= IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH ||
+	    sensor_idx < 0)
 		return IMGSENSOR_RETURN_ERROR;
 
 	reg_type_offset = REGULATOR_TYPE_VCAMA;
+	//bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
+	if(pin == IMGSENSOR_HW_PIN_DVDD){
+		check_for_regulator_get(preg, gimgsensor_device, sensor_idx, (reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD));
+	}
 
 	pregulator =
 		preg->pregulator[sensor_idx][
@@ -296,6 +323,10 @@ static enum IMGSENSOR_RETURN regulator_set(
 					return IMGSENSOR_RETURN_ERROR;
 				}
 			}
+			//bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
+			if(pin == IMGSENSOR_HW_PIN_DVDD){
+				check_for_regulator_put(preg, sensor_idx, (reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD));
+			}
 			atomic_dec(enable_cnt);
 		}
 	} else {
@@ -323,3 +354,40 @@ enum IMGSENSOR_RETURN imgsensor_hw_regulator_open(
 	return IMGSENSOR_RETURN_SUCCESS;
 }
 
+//+bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue
+static void check_for_regulator_get(struct REGULATOR *preg, struct device *pdevice, enum IMGSENSOR_SENSOR_IDX sensor_idx, int index)
+{
+    struct device_node *pof_node;
+    char str_regulator_name[LENGTH_FOR_SNPRINTF];
+
+    mutex_lock(&g_regulator_state_mutex);
+    if(regulator_status[sensor_idx][index]==0)
+    {
+	snprintf(str_regulator_name,
+				sizeof(str_regulator_name),
+				"cam%d_%s",
+				sensor_idx,
+				regulator_control[index].pregulator_type);
+
+        pof_node = pdevice->of_node;
+        pdevice->of_node = of_node_record;
+        preg->pregulator[sensor_idx][index] = regulator_get_optional(pdevice, str_regulator_name);
+        pdevice->of_node = pof_node;
+        regulator_status[sensor_idx][index] = 1;
+        pr_info("regulator_dbg regulator_get %s, of_node:%p\n", str_regulator_name, of_node_record);
+    }
+    mutex_unlock(&g_regulator_state_mutex);
+}
+static void check_for_regulator_put(struct REGULATOR *preg, enum IMGSENSOR_SENSOR_IDX sensor_idx, int index)
+{
+    mutex_lock(&g_regulator_state_mutex);
+    if(regulator_status[sensor_idx][index]==1)
+    {
+        regulator_put(preg->pregulator[sensor_idx][index]);
+	preg->pregulator[sensor_idx][index] = NULL;
+        regulator_status[sensor_idx][index]=0;
+        pr_info("regulator_dbg regulator_put cam%d index=%d\n", sensor_idx, index);
+    }
+    mutex_unlock(&g_regulator_state_mutex);
+}
+//-bug 612420,huangguoyong.wt,add,2021/01/20. fixed regulator val setting issue

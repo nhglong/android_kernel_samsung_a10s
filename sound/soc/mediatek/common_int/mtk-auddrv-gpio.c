@@ -84,6 +84,10 @@ enum audio_system_gpio_type {
 	GPIO_HPDEPOP_LOW,
 	GPIO_AUD_CLK_MOSI_HIGH,
 	GPIO_AUD_CLK_MOSI_LOW,
+	//+ Bug 621775 fujiawen.wt,add,20210129,add hac support
+	GPIO_HACAMP_HIGH,
+	GPIO_HACAMP_LOW,
+	//+ Bug 621775 fujiawen.wt,add,20210129,add hac support
 	GPIO_NUM
 };
 
@@ -135,6 +139,10 @@ static struct audio_gpio_attr aud_gpios[GPIO_NUM] = {
 					    NULL},
 		[GPIO_AUD_CLK_MOSI_LOW] = {"aud_clk_mosi_pull_low", false,
 					   NULL},
+		//+ Bug 621775 fujiawen.wt,add,20210129,add hac support
+		[GPIO_HACAMP_HIGH] = {"hacamp_pullhigh", false, NULL},
+		[GPIO_HACAMP_LOW] = {"hacamp_pulllow", false, NULL},
+		//- Bug 621775 fujiawen.wt,add,20210129,add hac support
 };
 
 static unsigned int extbuck_fan53526_exist;
@@ -376,6 +384,35 @@ int AudDrv_GPIO_SMARTPA_Select(int mode)
 	mutex_unlock(&gpio_request_mutex);
 	return retval;
 }
+
+//+ Bug 621775 fujiawen.wt,add,20210129,add hac support
+int HAC_Amp_Change(int bEnable)
+{
+        int retval = 0;
+        mutex_lock(&gpio_request_mutex);
+        if (bEnable == 1) {
+            if (aud_gpios[GPIO_HACAMP_HIGH].gpio_prepare) {
+                retval = pinctrl_select_state(
+                    pinctrlaud,
+                    aud_gpios[GPIO_HACAMP_HIGH].gpioctrl);
+                if (retval)
+                    pr_info("could not set aud_gpios[GPIO_HACAMP_HIGH] pins\n");
+            }
+        } else {
+            if (aud_gpios[GPIO_HACAMP_LOW].gpio_prepare) {
+                retval = pinctrl_select_state(
+                    pinctrlaud,
+                    aud_gpios[GPIO_HACAMP_LOW].gpioctrl);
+                if (retval)
+                    pr_info("could not set aud_gpios[GPIO_HACAMP_LOW] pins\n");
+            }
+        }
+        mutex_unlock(&gpio_request_mutex);
+
+        return retval;
+}
+//- Bug 621775 fujiawen.wt,add,20210129,add hac support
+
 
 int AudDrv_GPIO_TDM_Select(int mode)
 {

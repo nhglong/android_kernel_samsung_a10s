@@ -304,12 +304,22 @@ extern struct LCM_DRIVER nt51021h_wuxga_vdo_oncell_boe_lcm_drv;
 extern struct LCM_DRIVER nt36672ah_hdp_dsi_vdo_tcl_csot_lcm_drv;
 extern struct LCM_DRIVER nt36672ah_hdp_dsi_vdo_tcl_csot_fwvplus_lcm_drv;
 extern struct LCM_DRIVER sofeg01_fhdplus_dsi_cmd_samsung_lcm_drv;
-
-#if defined(NT36672C_FHDP_DSI_VDO_AUO_CPHY_90HZ_TIANMA)
-extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_auo_cphy_90hz_tianma_lcm_drv;
-#endif
-
 extern struct LCM_DRIVER oppo_tianma_td4310_fhdp_dsi_vdo_rt5081_lcm_drv;
+
+extern struct LCM_DRIVER td4150_hdp_dsi_lm36274_lcm_drv;
+extern struct LCM_DRIVER ili9882n_hdp_dsi_vdo_ilitek_lm36274_lcm_drv;
+extern struct LCM_DRIVER virtual_dsi_vdo_default;
+extern struct LCM_DRIVER ili9881h_hd_plus_dsi_vdo_truly_lcm_drv;
+extern struct LCM_DRIVER ili9881h_hd_plus_dsi_vdo_txd_lcm_drv;
+extern struct LCM_DRIVER ili9882n_hd_plus_dsi_vdo_txd_lcm_drv;
+extern struct LCM_DRIVER ili9882n_hd_plus_dsi_vdo_ls_lcm_drv;
+extern struct LCM_DRIVER ft8006p_hd_plus_dsi_vdo_tianma_lcm_drv;
+extern struct LCM_DRIVER hx83112a_hd_plus_dsi_vdo_lide_lcm_drv;
+extern struct LCM_DRIVER icnl9911c_hd_plus_dsi_vdo_txd_lcm_drv;
+extern struct LCM_DRIVER ili9881h_hd_plus_dsi_vdo_truly_m_lcm_drv;
+extern struct LCM_DRIVER ili7807g_hd_plus_dsi_vdo_txd_na_lcm_drv; //bug621774, liuguohua.wt, add, 20210120, 1st lcd bring up
+extern struct LCM_DRIVER ili7807g_hd_plus_dsi_vdo_truly_na_lcm_drv;//bug621774, liuguohua.wt, add, 20210125, 2nd lcd bring up
+extern struct LCM_DRIVER ili7806s_hd_plus_dsi_vdo_txd_na_lcm_drv;//Bug 621774, chensibo.wt, ADD, 20210120, porting third lcd bringup
 
 #ifdef BUILD_LK
 extern void mdelay(unsigned long msec);

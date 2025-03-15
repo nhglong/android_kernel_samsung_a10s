@@ -7,6 +7,7 @@
 
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
+#include <linux/timer.h>
 #include <linux/of_address.h>
 #include <linux/sched/clock.h>
 
@@ -323,7 +324,8 @@ static void mtk_btcvsd_snd_data_transfer(enum bt_sco_direct dir,
 /* write encoded mute data to bt sram */
 static int btcvsd_tx_clean_buffer(struct mtk_btcvsd_snd *bt)
 {
-	unsigned int i;
+	void *dst;
+	unsigned long connsys_addr_tx, ap_addr_tx;
 	unsigned int num_valid_addr;
 	unsigned long flags;
 	enum BT_SCO_BAND band = bt->band;
@@ -345,19 +347,27 @@ static int btcvsd_tx_clean_buffer(struct mtk_btcvsd_snd *bt)
 	dev_info(bt->dev, "%s(), band %d, num_valid_addr %u\n",
 		 __func__, band, num_valid_addr);
 
-	for (i = 0; i < num_valid_addr; i++) {
-		void *dst;
+	connsys_addr_tx = *bt->bt_reg_pkt_w;
+	ap_addr_tx = (unsigned long)bt->bt_sram_bank2_base +
+		     (connsys_addr_tx & 0xFFFF);
 
-		dev_info(bt->dev, "%s(), clean addr 0x%lx\n", __func__,
-			 bt->tx->buffer_info.bt_sram_addr[i]);
-
-		dst = (void *)bt->tx->buffer_info.bt_sram_addr[i];
-
-		mtk_btcvsd_snd_data_transfer(BT_SCO_DIRECT_ARM2BT,
-					     bt->tx->temp_packet_buf, dst,
-					     bt->tx->buffer_info.packet_length,
-					     bt->tx->buffer_info.packet_num);
+	if (connsys_addr_tx == 0xdeadfeed) {
+		/* bt return 0xdeadfeed if read register during bt sleep */
+		dev_warn(bt->dev, "%s(), connsys_addr_tx == 0xdeadfeed\n",
+			 __func__);
+		spin_unlock_irqrestore(&bt->tx_lock, flags);
+		return -EIO;
 	}
+
+	dst = (void *)ap_addr_tx;
+
+	dev_info(bt->dev, "%s(), clean addr 0x%lx\n", __func__, ap_addr_tx);
+
+	mtk_btcvsd_snd_data_transfer(BT_SCO_DIRECT_ARM2BT,
+				     bt->tx->temp_packet_buf, dst,
+				     bt->tx->buffer_info.packet_length,
+				     bt->tx->buffer_info.packet_num);
+
 	spin_unlock_irqrestore(&bt->tx_lock, flags);
 	bt->write_tx = 1;
 
@@ -663,7 +673,11 @@ static irqreturn_t mtk_btcvsd_snd_irq_handler(int irq_id, void *dev)
 
 	return IRQ_HANDLED;
 irq_handler_exit:
+	*bt->bt_reg_ctl |= BT_CVSD_TX_UNDERFLOW;
 	*bt->bt_reg_ctl &= ~BT_CVSD_CLEAR;
+	dev_warn(bt->dev, "%s(), irq_handler_exit, bt_reg_ctl = 0x%lx\n",
+		 __func__, *bt->bt_reg_ctl);
+
 	return IRQ_HANDLED;
 }
 
@@ -675,11 +689,13 @@ static int wait_for_bt_irq(struct mtk_btcvsd_snd *bt,
 	unsigned long long timeout_limit = 22500000;
 	int max_timeout_trial = 2;
 	int ret;
+	struct timespec64 ts64;
 
 	bt_stream->wait_flag = 0;
 
 	while (max_timeout_trial && !bt_stream->wait_flag) {
-		t1 = sched_clock();
+		ktime_get_ts64(&ts64);
+		t1 = timespec64_to_ns(&ts64);
 		if (bt_stream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			ret = wait_event_interruptible_timeout(bt->tx_wait,
 				bt_stream->wait_flag,
@@ -690,7 +706,8 @@ static int wait_for_bt_irq(struct mtk_btcvsd_snd *bt,
 				nsecs_to_jiffies(timeout_limit));
 		}
 
-		t2 = sched_clock();
+		ktime_get_ts64(&ts64);
+		t2 = timespec64_to_ns(&ts64);
 		t2 = t2 - t1; /* in ns (10^9) */
 
 		if (t2 > timeout_limit) {
@@ -737,6 +754,7 @@ ssize_t mtk_btcvsd_snd_read(struct mtk_btcvsd_snd *bt,
 	unsigned long avail;
 	unsigned long flags;
 	unsigned int packet_size = bt->rx->packet_size;
+	struct timespec64 ts64;
 
 	while (count) {
 		spin_lock_irqsave(&bt->rx_lock, flags);
@@ -797,7 +815,8 @@ ssize_t mtk_btcvsd_snd_read(struct mtk_btcvsd_snd *bt,
 	 * save current timestamp & buffer time in times_tamp and
 	 * buf_data_equivalent_time
 	 */
-	bt->rx->time_stamp = sched_clock();
+	ktime_get_ts64(&ts64);
+	bt->rx->time_stamp = timespec64_to_ns(&ts64);
 	bt->rx->buf_data_equivalent_time =
 		(unsigned long long)(bt->rx->packet_w - bt->rx->packet_r) *
 		SCO_RX_PLC_SIZE * 16 * 1000 / 2 / 64;
@@ -817,12 +836,14 @@ ssize_t mtk_btcvsd_snd_write(struct mtk_btcvsd_snd *bt,
 	unsigned int cur_buf_ofs = 0;
 	unsigned long flags;
 	unsigned int packet_size = bt->tx->packet_size;
+	struct timespec64 ts64;
 
 	/*
 	 * save current timestamp & buffer time in time_stamp and
 	 * buf_data_equivalent_time
 	 */
-	bt->tx->time_stamp = sched_clock();
+	ktime_get_ts64(&ts64);
+	bt->tx->time_stamp = timespec64_to_ns(&ts64);
 	bt->tx->buf_data_equivalent_time =
 		(unsigned long long)(bt->tx->packet_w - bt->tx->packet_r) *
 		packet_size * 16 * 1000 / 2 / 64;

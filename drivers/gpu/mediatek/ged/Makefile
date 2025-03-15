@@ -69,6 +69,8 @@ endif
 
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6765"))
 #ccflags-y += -DCONFIG_MTK_QOS_V1_SUPPORT
+ccflags-y += -DGED_SKI_SUPPORT
+ged-y += src/ged_ski.o
 endif
 
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6768" "mt6771"))

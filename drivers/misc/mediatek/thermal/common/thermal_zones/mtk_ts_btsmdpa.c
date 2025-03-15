@@ -138,6 +138,12 @@ static int g_RAP_ADC_channel = BTSMDPA_RAP_ADC_CHANNEL;
 static int g_btsmdpa_TemperatureR;
 /* struct BTSMDPA_TEMPERATURE BTSMDPA_Temperature_Table[] = {0}; */
 
+/* Add HW version check to avoid reading AP AUXADC for bringup phone */
+#ifdef MTK_FIX_PA_THERMAL
+static unsigned int fix_pa_thm_enable;
+static unsigned int fix_pa_thm;
+#endif
+
 static struct BTSMDPA_TEMPERATURE *BTSMDPA_Temperature_Table;
 static int ntc_tbl_size;
 
@@ -583,6 +589,14 @@ static int get_hw_btsmdpa_temp(void)
 	int ret = 0, data[4], i, ret_value = 0, ret_temp = 0, output;
 	int times = 1, Channel = g_RAP_ADC_channel; /* 6752=0(AUX_IN1_NTC) */
 	static int valid_temp;
+#endif
+
+#ifdef MTK_FIX_PA_THERMAL
+	if (fix_pa_thm_enable) {
+		mtkts_btsmdpa_printk("[%s][fix_pa_thm_enable] fix_pa_thm=%d\n",
+			__func__, fix_pa_thm);
+		return fix_pa_thm;
+	}
 #endif
 
 #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
@@ -1426,6 +1440,30 @@ static int __init mtkts_btsmdpa_init(void)
 
 	mtkts_btsmdpa_dprintk("[%s]\n", __func__);
 
+	/* Get HW version from device tree */
+#ifdef MTK_FIX_PA_THERMAL
+	{
+		struct device_node *root = of_find_node_by_path("/");
+		int ret;
+
+		if (IS_ERR_OR_NULL(root)) {
+			mtkts_btsmdpa_printk("root dev node is NULL\n");
+			return -1;
+		}
+
+		fix_pa_thm_enable = of_property_read_bool(root, "fix-pa-thm-enable");
+		mtkts_btsmdpa_printk("get fix-pa-thm-enable :%d\n", fix_pa_thm_enable);
+
+		ret = of_property_read_u32(root, "fix-pa-thm", &fix_pa_thm);
+		if (ret < 0) {
+			mtkts_btsmdpa_printk("get w/a pa_thm fail:%d\n", ret);
+			fix_pa_thm = 0;
+		} else {
+			mtkts_btsmdpa_printk("get w/a pa_thm = %d\n",
+				fix_pa_thm);
+		}
+	}
+#endif
 
 #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
 	err = platform_driver_register(&mtk_thermal_btsmdpa_driver);

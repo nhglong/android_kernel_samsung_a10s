@@ -34,7 +34,6 @@
 #include <mt-plat/sync_write.h>
 //#include <mt-plat/mtk_io.h>
 #include <mt-plat/aee.h>
-#include <trace/events/power.h>
 /* #include <trace/events/mtk_events.h> */
 
 #ifdef CONFIG_MTK_TINYSYS_SSPM_SUPPORT
@@ -300,8 +299,6 @@ int Ripi_cpu_dvfs_thread(void *data)
 						p->mt_policy->min);
 				}
 #endif
-
-				trace_cpu_frequency_limits(p->mt_policy);
 
 				/* Policy notification */
 				if (p->idx_opp_tbl != j ||

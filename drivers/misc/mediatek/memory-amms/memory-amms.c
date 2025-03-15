@@ -152,6 +152,8 @@ int free_reserved_memory(phys_addr_t start_phys,
 
 	memblock_free(start_phys, (end_phys - start_phys));
 
+	free_memsize_reserved(start_phys, (end_phys - start_phys));
+
 	for (pos = start_phys; pos < end_phys; pos += PAGE_SIZE, pages++)
 		free_reserved_page(phys_to_page(pos));
 

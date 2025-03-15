@@ -1484,6 +1484,13 @@ static ssize_t UI_SOC_show(
 
 }
 
+//+bug 615299,xuejizhou.wt,ADD,20201228, battery SOC limitation for store mode
+signed int battery_get_debug_uisoc(void)
+{
+	return get_mtk_battery()->fixed_uisoc;
+}
+//-bug 615299,xuejizhou.wt,ADD,20201228, battery SOC limitation for store mode
+
 static ssize_t UI_SOC_store(
 	struct device *dev, struct device_attribute *attr,
 	const char *buf, size_t size)
@@ -2315,6 +2322,10 @@ static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 
 		if (gm->bs_data.bat_status == POWER_SUPPLY_STATUS_CHARGING)
 			is_charger_exist = true;
+#if defined CONFIG_MT6370_PMU_CHARGER || defined CONFIG_CHARGER_BQ2415X
+		else if (gm->bs_data.bat_status == POWER_SUPPLY_STATUS_FULL)
+			is_charger_exist = true;
+#endif
 		else
 			is_charger_exist = false;
 
@@ -3341,15 +3352,22 @@ static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 	case FG_DAEMON_CMD_GET_SHUTDOWN_CAR:
 	{
 		int shutdown_car_diff = 0;
+		int tmp_cardiff = 0;
 
 		shutdown_car_diff = gauge_get_int_property(
 			GAUGE_PROP_SHUTDOWN_CAR);
+
+		if (abs(shutdown_car_diff) > 1000) {
+			tmp_cardiff = shutdown_car_diff;
+			shutdown_car_diff = 0;
+		}
+
 		ret_msg->fgd_data_len += sizeof(shutdown_car_diff);
 		memcpy(ret_msg->fgd_data, &shutdown_car_diff,
 			sizeof(shutdown_car_diff));
 		bm_debug(
-			"[K]FG_DAEMON_CMD_GET_SHUTDOWN_CAR = %d\n",
-			shutdown_car_diff);
+			"[K]FG_DAEMON_CMD_GET_SHUTDOWN_CAR = %d, tmp=%d\n",
+			shutdown_car_diff, tmp_cardiff);
 	}
 	break;
 	case FG_DAEMON_CMD_GET_NCAR:

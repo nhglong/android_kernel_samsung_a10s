@@ -17,6 +17,9 @@ obj-$(CONFIG_SND_SOC_MT6797) += mt6797/
 obj-$(CONFIG_SND_SOC_MT6779) += mt6779/
 obj-$(CONFIG_SND_SOC_MT8173) += mt8173/
 obj-$(CONFIG_SND_SOC_AW87519) += aw87519/
+obj-$(CONFIG_SND_SOC_AW87319) += aw87319/
+#Bug 621774 fujiawen.wt,add,20210126,mk smartpa src
+obj-$(CONFIG_SND_SMARTPA_AW881XX) += aw881xx/
 
 # include path
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
@@ -51,7 +54,7 @@ subdir-ccflags-y += -DSND_SOC_AW87519
 endif
 
 # include path
-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
+subdir-ccflags-y += -Werror -I$(srctree)/sound/soc/codecs/
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat

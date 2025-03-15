@@ -429,21 +429,37 @@ void dump_reg_row(unsigned long baddr, unsigned long offset, unsigned int count)
 	if (count > 4)
 		return;
 
-	len += scnprintf(buf, buf_len, "0x%03lx:", offset);
+	ret = snprintf(buf, buf_len, "0x%03lx:", offset);
+	if (ret < 0) {
+		DISP_LOG_E("[%s %d]snprintf err:%d\n",
+			   __func__, __LINE__, ret);
+		ret = 0;
+	}
+	len += ret;
 
 	for (i = 0; i < count; i++) {
 		val = INREG32(baddr + offset + 0x4 * i);
 		if (val)
-			ret = scnprintf(buf + len, buf_len - len,
+			ret = snprintf(buf + len, buf_len - len,
 				       "0x%08x", val);
 		else
-			ret = scnprintf(buf + len, buf_len - len, "%10x", val);
+			ret = snprintf(buf + len, buf_len - len, "%10x", val);
+		if (ret < 0) {
+			DISP_LOG_E("[%s %d]snprintf err:%d\n",
+				   __func__, __LINE__, ret);
+			ret = 0;
+		}
 		len += ret;
 
 		if (i < count - 1)
-			ret = scnprintf(buf + len, buf_len - len, " ");
+			ret = snprintf(buf + len, buf_len - len, " ");
 		else if (i == count - 1)
-			ret = scnprintf(buf + len, buf_len - len, "\n");
+			ret = snprintf(buf + len, buf_len - len, "\n");
+		if (ret < 0) {
+			DISP_LOG_E("[%s %d]snprintf err:%d\n",
+				   __func__, __LINE__, ret);
+			ret = 0;
+		}
 		len += ret;
 
 	}
@@ -563,13 +579,12 @@ static void mutex_dump_analysis(void)
 			continue;
 
 		val = DISP_REG_GET(DISP_REG_CONFIG_MUTEX_SOF(i));
-		len = scnprintf(p, 100,
-			"MUTEX%d:SOF=%s,EOF=%s,WAIT=%d,module=(",
-			i, ddp_get_mutex_sof_name(
+		len = sprintf(p, "MUTEX%d:SOF=%s,EOF=%s,WAIT=%d,module=(",
+		      i, ddp_get_mutex_sof_name(
 				REG_FLD_VAL_GET(SOF_FLD_MUTEX0_SOF, val)),
-			ddp_get_mutex_sof_name(
+		      ddp_get_mutex_sof_name(
 				REG_FLD_VAL_GET(SOF_FLD_MUTEX0_EOF, val)),
-			REG_FLD_VAL_GET(SOF_FLD_MUTEX0_SOF_WAIT, val));
+		      REG_FLD_VAL_GET(SOF_FLD_MUTEX0_SOF_WAIT, val));
 
 		p += len;
 		for (j = 0; j < 32; j++) {
@@ -577,7 +592,7 @@ static void mutex_dump_analysis(void)
 				DISP_REG_GET(DISP_REG_CONFIG_MUTEX_MOD0(i));
 
 			if ((regval & (1 << j))) {
-				len = scnprintf(p, 50, "%s,",
+				len = sprintf(p, "%s,",
 					      ddp_get_mutex_module0_name(j));
 				p += len;
 			}
@@ -876,16 +891,16 @@ static void mmsys_config_dump_analysis(void)
 		pos = clock_on;
 
 		if ((valid0 & (1 << i)))
-			pos += scnprintf(pos, 10, "%s,", "v");
+			pos += sprintf(pos, "%s,", "v");
 		else
-			pos += scnprintf(pos, 10, "%s,", "n");
+			pos += sprintf(pos, "%s,", "n");
 
 		if ((ready0 & (1 << i)))
-			pos += scnprintf(pos, 10, "%s", "r");
+			pos += sprintf(pos, "%s", "r");
 		else
-			pos += scnprintf(pos, 10, "%s", "n");
+			pos += sprintf(pos, "%s", "n");
 
-		pos += scnprintf(pos, 50, ": %s", name);
+		pos += sprintf(pos, ": %s", name);
 
 		DDPDUMP("%s\n", clock_on);
 	}
@@ -898,16 +913,16 @@ static void mmsys_config_dump_analysis(void)
 		pos = clock_on;
 
 		if ((valid1 & (1 << i)))
-			pos += scnprintf(pos, 10, "%s,", "v");
+			pos += sprintf(pos, "%s,", "v");
 		else
-			pos += scnprintf(pos, 10, "%s,", "n");
+			pos += sprintf(pos, "%s,", "n");
 
 		if ((ready1 & (1 << i)))
-			pos += scnprintf(pos, 10, "%s", "r");
+			pos += sprintf(pos, "%s", "r");
 		else
-			pos += scnprintf(pos, 10, "%s", "n");
+			pos += sprintf(pos, "%s", "n");
 
-		pos += scnprintf(pos, 50, ": %s", name);
+		pos += sprintf(pos, ": %s", name);
 
 		DDPDUMP("%s\n", clock_on);
 	}
@@ -920,25 +935,29 @@ static void mmsys_config_dump_analysis(void)
 		pos = clock_on;
 
 		if ((valid2 & (1 << i)))
-			pos += scnprintf(pos, 10, "%s,", "v");
+			pos += sprintf(pos, "%s,", "v");
 		else
-			pos += scnprintf(pos, 10, "%s,", "n");
+			pos += sprintf(pos, "%s,", "n");
 
 		if ((ready2 & (1 << i)))
-			pos += scnprintf(pos, 10, "%s", "r");
+			pos += sprintf(pos, "%s", "r");
 		else
-			pos += scnprintf(pos, 10, "%s", "n");
+			pos += sprintf(pos, "%s", "n");
 
-		pos += scnprintf(pos, 50, ": %s", name);
+		pos += sprintf(pos, ": %s", name);
 
 		DDPDUMP("%s\n", clock_on);
 	}
 
 	/* greq: 1 means SMI dose not grant, maybe SMI hang */
 	if (greq) {
-		n = scnprintf(msg, len,
+		n = snprintf(msg, len,
 			     "smi greq not grant module: (greq: 1 means SMI dose not grant, maybe SMI hang)");
-		DDPDUMP("%s", msg);
+		if (n < 0) {
+			DISP_LOG_E("[%s %d]snprintf err:%d\n",
+				   __func__, __LINE__, n);
+		} else
+			DDPDUMP("%s", msg);
 	}
 
 	clock_on[0] = '\0';

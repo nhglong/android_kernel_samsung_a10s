@@ -44,6 +44,7 @@
 
 
 #ifdef M4U_TEE_SERVICE_ENABLE
+#include "m4u_sec_gp.h"
 #if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && \
 	!defined(CONFIG_TEE)
 #include "mobicore_driver_api.h"
@@ -1220,7 +1221,6 @@ static int MTK_M4U_flush(struct file *filp, fl_owner_t a_id)
 }
 
 #ifdef M4U_TEE_SERVICE_ENABLE
-#include "m4u_sec_gp.h"
 
 static DEFINE_MUTEX(gM4u_sec_init);
 

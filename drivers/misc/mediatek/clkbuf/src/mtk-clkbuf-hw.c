@@ -129,7 +129,6 @@ static struct dts_predef clkbuf_dts[DTS_NUM] = {
 	[XO_HW_SEL] = {"pmic-xo-mode", 7, 0, 0x3, 0},
 
 	[BBL_SW_EN] = {"pmic-bblpm-sw", 1, 0, 0x1, 0},
-
 	[MISC_SRCLKENI_EN] = {"pmic-srclkeni3", 1, 0, 0x1, 0},
 
 	[PWRAP_DCXO_EN] = {"pwrap-dcxo-en", 1, 0, 0xffff, 0},
@@ -311,6 +310,12 @@ static void _clk_buf_en_set(enum clk_buf_id id, bool onoff)
 		clkbuf_clr(XO_SW_EN, id, 0x1);
 }
 
+/* for spm driver use */
+bool _clk_buf_get_flight_mode(void)
+{
+	return is_flightmode_on;
+}
+
 static enum dev_sta _get_nfc_dev_state(void)
 {
 	pr_info("%s: NFC support: %d\n", __func__, NFC_CLKBUF_SUPPORT);
@@ -379,19 +384,16 @@ static void _clk_buf_get_enter_bblpm_cond(u32 *bblpm_cond)
 		return;
 	}
 
-	clkbuf_read(SPM_MD_PWR_STA, 0, &val);
-	if (val)
+	if (!_clk_buf_get_flight_mode())
 		(*bblpm_cond) |= BBLPM_CEL;
 
 	clkbuf_read(SPM_CONN_PWR_STA, 0, &val);
-	if (val || pmic_clk_buf_swctrl[XO_WCN])
+	if (val)
 		(*bblpm_cond) |= BBLPM_WCN;
 
 	val = _clk_buf_en_get(CLK_BUF_NFC);
-	if (val || pmic_clk_buf_swctrl[XO_NFC])
+	if (val)
 		(*bblpm_cond) |= BBLPM_NFC;
-
-	pr_info("%s: bblpm condition: 0x%x\n", __func__, *bblpm_cond);
 }
 
 static void _clk_buf_get_bblpm_en(u32 *stat)
@@ -494,12 +496,6 @@ static int _clk_buf_bblpm_init(void)
 	return -1;
 }
 #endif
-
-/* for spm driver use */
-bool _clk_buf_get_flight_mode(void)
-{
-	return is_flightmode_on;
-}
 
 /* for ccci driver to notify this */
 void _clk_buf_set_flight_mode(bool on)
@@ -1018,15 +1014,58 @@ static ssize_t clk_buf_bblpm_show(struct kobject *kobj,
 	return len;
 }
 
+static u32 default_cap_id = 0x55;
+static ssize_t clk_buf_capid_store(struct kobject *kobj,
+	struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	u32 cap_id = 0;
+
+	if ((kstrtouint(buf, 10, &cap_id))) {
+		pr_info("cap id input error\n");
+		return -EPERM;
+	}
+
+	pr_info("cap id input (%d)\n", cap_id);
+	if (cap_id < 256) {
+		if (default_cap_id == 0x55) {
+			if (check_pmic_clkbuf_op())
+				pmic_op->pmic_clk_buf_get_cap_id(
+					&default_cap_id);
+		}
+		if (check_pmic_clkbuf_op())
+			pmic_op->pmic_clk_buf_set_cap_id(cap_id);
+	} else {
+		return -EPERM;
+	}
+
+	return count;
+}
+
+static ssize_t clk_buf_capid_show(struct kobject *kobj,
+	struct kobj_attribute *attr, char *buf)
+{
+	u32 cap_id = 0;
+	int len = 0;
+
+	if (check_pmic_clkbuf_op())
+		pmic_op->pmic_clk_buf_get_cap_id(&cap_id);
+	pr_info("default cap id(%#x), cap id(%#x)\n", default_cap_id, cap_id);
+	len = snprintf(buf, PAGE_SIZE, "default cap id(%#x), cap id(%#x)\n",
+		default_cap_id, cap_id);
+	return len;
+}
+
 DEFINE_ATTR_RW(clk_buf_ctrl);
 DEFINE_ATTR_RW(clk_buf_debug);
 DEFINE_ATTR_RW(clk_buf_bblpm);
+DEFINE_ATTR_RW(clk_buf_capid);
 
 static struct attribute *clk_buf_attrs[] = {
 	/* for clock buffer control */
 	__ATTR_OF(clk_buf_ctrl),
 	__ATTR_OF(clk_buf_debug),
 	__ATTR_OF(clk_buf_bblpm),
+	__ATTR_OF(clk_buf_capid),
 
 	/* must */
 	NULL,

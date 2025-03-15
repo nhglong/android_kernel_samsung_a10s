@@ -1912,3 +1912,5 @@ config RAVE_SP_CORE
 
 endmenu
 endif
+
+source "drivers/mfd/sm/sm5714/Kconfig"
