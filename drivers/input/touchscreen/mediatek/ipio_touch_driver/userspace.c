@@ -277,8 +277,9 @@ static ssize_t ilitek_proc_get_delta_data_read(struct file *pFile, char __user *
 	}
 
 	ret = copy_to_user(buf, g_user_buf, nCount);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space");
+		return -EFAULT;
 	}
 
 	*pos += nCount;
@@ -366,8 +367,9 @@ static ssize_t ilitek_proc_fw_get_raw_data_read(struct file *pFile, char __user 
 	}
 
 	ret = copy_to_user(buf, g_user_buf, nCount);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space");
+		return -EFAULT;
 	}
 
 	*pos += nCount;
@@ -397,8 +399,9 @@ static ssize_t ilitek_proc_fw_pc_counter_read(struct file *pFile, char __user *b
 	nCount = snprintf(g_user_buf, PAGE_SIZE, "pc counter = 0x%x\n", pc);
 
 	pc = copy_to_user(buf, g_user_buf, nCount);
-	if (pc < 0) {
+	if (pc) {
 		ipio_err("Failed to copy data to user space");
+		return -EFAULT;
 	}
 
 	*pos += nCount;
@@ -424,8 +427,9 @@ static ssize_t ilitek_proc_debug_switch_read(struct file *pFile, char __user *bu
 	*pPos += nCount;
 
 	ret = copy_to_user(buff, g_user_buf, nCount);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space");
+		return -EFAULT;
 	}
 
 	return nCount;
@@ -443,9 +447,9 @@ static ssize_t ilitek_proc_debug_message_write(struct file *filp, const char *bu
 	}
 
 	ret = copy_from_user(buffer, buff, size - 1);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("copy data from user space, failed");
-		return -1;
+		return -EFAULT;
 	}
 
 	if (strcmp(buffer, "dbg_flag") == 0) {
@@ -547,7 +551,7 @@ static ssize_t ilitek_proc_debug_message_read(struct file *filp, char __user *bu
 
 		if (ret) {
 			ipio_err("copy_to_user err\n");
-			ret = -EFAULT;
+			return -EFAULT;
 		} else {
 			*pPos += count;
 			ret = count;
@@ -596,8 +600,10 @@ static ssize_t ilitek_proc_mp_lcm_on_test_read(struct file *filp, char __user *b
 	/* copy MP result to user */
 	core_mp_copy_reseult(apk, ARRAY_SIZE(apk));
 	ret = copy_to_user((char *)buff, apk, sizeof(apk));
-	if (ret < 0)
+	if (ret) {
 		ipio_err("Failed to copy data to user space\n");
+		return -EFAULT;
+	}
 
 out:
 	core_mp_test_free();
@@ -631,8 +637,10 @@ static ssize_t ilitek_proc_mp_lcm_off_test_read(struct file *filp, char __user *
 	/* copy MP result to user */
 	core_mp_copy_reseult(apk, ARRAY_SIZE(apk));
 	ret = copy_to_user((char *)buff, apk, sizeof(apk));
-	if (ret < 0)
+	if (ret) {
 		ipio_err("Failed to copy data to user space\n");
+		return -EFAULT;
+	}
 
 out:
 	core_mp_test_free();
@@ -683,8 +691,9 @@ static ssize_t ilitek_proc_debug_level_read(struct file *filp, char __user *buff
 	len += snprintf(g_user_buf +len, PAGE_SIZE - len, "DEBUG_ALL = %d\n", DEBUG_ALL);
 
 	ret = copy_to_user((uint32_t *) buff, g_user_buf, len);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space\n");
+		return -EFAULT;
 	}
 
 	*pPos += len;
@@ -913,8 +922,9 @@ static ssize_t ilitek_proc_read_write_register_read(struct file *pFile, char __u
 	mutex_unlock(&ipd->plat_mutex);
 
 	ret = copy_to_user(buf, g_user_buf, nCount);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space");
+		return -EFAULT;
 	}
 
 	*pos += nCount;
@@ -932,9 +942,9 @@ static ssize_t ilitek_proc_read_write_register_write(struct file *filp, const ch
 
 	if (buff != NULL) {
 		ret = copy_from_user(cmd, buff, size - 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_info("copy data from user space, failed\n");
-			return -1;
+			return -EFAULT;
 		}
 	}
 
@@ -958,9 +968,9 @@ static ssize_t ilitek_proc_get_debug_mode_data_write(struct file *filp, const ch
 
 	if (buff != NULL) {
 		ret = copy_from_user(cmd, buff, size - 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_info("copy data from user space, failed\n");
-			return -1;
+			return -EFAULT;
 		}
 	}
 
@@ -990,9 +1000,9 @@ static ssize_t ilitek_proc_debug_level_write(struct file *filp, const char *buff
 
 	if (buff != NULL) {
 		ret = copy_from_user(cmd, buff, size - 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_info("copy data from user space, failed\n");
-			return -1;
+			return -EFAULT;
 		}
 	}
 
@@ -1018,8 +1028,9 @@ static ssize_t ilitek_proc_gesture_read(struct file *filp, char __user *buff, si
 	ipio_info("isEnableGesture = %d\n", core_config->isEnableGesture);
 
 	ret = copy_to_user((uint32_t *) buff, g_user_buf, len);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space\n");
+		return -EFAULT;
 	}
 
 	*pPos = len;
@@ -1034,9 +1045,9 @@ static ssize_t ilitek_proc_gesture_write(struct file *filp, const char *buff, si
 
 	if (buff != NULL) {
 		ret = copy_from_user(cmd, buff, size - 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_info("copy data from user space, failed\n");
-			return -1;
+			return -EFAULT;
 		}
 	}
 
@@ -1075,8 +1086,9 @@ static ssize_t ilitek_proc_check_battery_read(struct file *filp, char __user *bu
 	ipio_info("isEnablePollCheckPower = %d\n", ipd->isEnablePollCheckPower);
 
 	ret = copy_to_user((uint32_t *) buff, g_user_buf, len);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space\n");
+		return -EFAULT;
 	}
 
 	*pPos = len;
@@ -1101,9 +1113,9 @@ static ssize_t ilitek_proc_check_battery_write(struct file *filp, const char *bu
 
 	if (buff != NULL) {
 		ret = copy_from_user(cmd, buff, size - 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_info("copy data from user space, failed\n");
-			return -1;
+			return -EFAULT;
 		}
 	}
 
@@ -1139,8 +1151,9 @@ static ssize_t ilitek_proc_check_esd_read(struct file *filp, char __user *buff, 
 	ipio_info("isEnablePollCheckEsd = %d\n", ipd->isEnablePollCheckEsd);
 
 	ret = copy_to_user((uint32_t *) buff, g_user_buf, len);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space\n");
+		return -EFAULT;
 	}
 
 	*pPos = len;
@@ -1165,9 +1178,9 @@ static ssize_t ilitek_proc_check_esd_write(struct file *filp, const char *buff, 
 
 	if (buff != NULL) {
 		ret = copy_from_user(cmd, buff, size - 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_info("copy data from user space, failed\n");
-			return -1;
+			return -EFAULT;
 		}
 	}
 
@@ -1208,8 +1221,9 @@ static ssize_t ilitek_proc_fw_process_read(struct file *filp, char __user *buff,
 	ipio_info("update status = %d\n", core_firmware->update_status);
 
 	ret = copy_to_user((uint32_t *) buff, &core_firmware->update_status, len);
-	if (ret < 0) {
+	if (ret) {
 		ipio_err("Failed to copy data to user space\n");
+		return -EFAULT;
 	}
 
 	*pPos = len;
@@ -1255,8 +1269,9 @@ static ssize_t ilitek_proc_fw_upgrade_read(struct file *filp, char __user *buff,
 	len = sprintf(g_user_buf, "upgrade firwmare %s\n", (ret < 0) ? "failed" : "succeed");
 
 	ret = copy_to_user((uint32_t *) buff, g_user_buf, len);
-	if (ret < 0) {
-	        ipio_err("Failed to copy data to user space\n");
+	if (ret) {
+	    ipio_err("Failed to copy data to user space\n");
+		return -EFAULT;
 	}
 
 	*pPos = len;
@@ -1276,9 +1291,9 @@ static ssize_t ilitek_proc_ioctl_write(struct file *filp, const char *buff, size
 
 	if (buff != NULL) {
 		ret = copy_from_user(cmd, buff, size - 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_info("copy data from user space, failed\n");
-			return -1;
+			return -EFAULT;
 		}
 	}
 
@@ -1532,8 +1547,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 	case ILITEK_IOCTL_I2C_WRITE_DATA:
 		ipio_info("ioctl: i2c write: len = %d\n", i2c_rw_length);
 		ret = copy_from_user(szBuf, (uint8_t *) arg, i2c_rw_length);
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
+			return -EFAULT;
 		} else {
 			ret = core_write(core_config->slave_i2c_addr, &szBuf[0], i2c_rw_length);
 			if (ret < 0)
@@ -1544,12 +1560,14 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 	case ILITEK_IOCTL_I2C_READ_DATA:
 		ipio_info("ioctl: i2c read: len = %d\n", i2c_rw_length);
 		ret = core_read(core_config->slave_i2c_addr, szBuf, i2c_rw_length);
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to read data via i2c\n");
 		} else {
 			ret = copy_to_user((uint8_t *) arg, szBuf, i2c_rw_length);
-			if (ret < 0)
+			if (ret) {
 				ipio_err("Failed to copy data to user space\n");
+				return -EFAULT;
+			}
 		}
 		break;
 
@@ -1571,8 +1589,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 
 	case ILITEK_IOCTL_TP_REPORT_SWITCH:
 		ret = copy_from_user(szBuf, (uint8_t *) arg, 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
+			return -EFAULT;
 		} else {
 			ipio_info("ioctl: report switch = %d\n", szBuf[0]);
 			if (szBuf[0]) {
@@ -1588,8 +1607,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 	case ILITEK_IOCTL_TP_IRQ_SWITCH:
 		ipio_info("ioctl: irq switch = %d\n", szBuf[0]);
 		ret = copy_from_user(szBuf, (uint8_t *) arg, 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
+			return -EFAULT;
 		} else {
 			if (szBuf[0]) {
 				ilitek_platform_enable_irq();
@@ -1601,8 +1621,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 
 	case ILITEK_IOCTL_TP_DEBUG_LEVEL:
 		ret = copy_from_user(dbg, (uint32_t *) arg, sizeof(uint32_t));
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
+			return -EFAULT;
 		} else {
 			ipio_debug_level = katoi(dbg);
 			ipio_info("ipio_debug_level = %d", ipio_debug_level);
@@ -1611,8 +1632,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 
 	case ILITEK_IOCTL_TP_FUNC_MODE:
 		ret = copy_from_user(szBuf, (uint8_t *) arg, 3);
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
+			return -EFAULT;
 		} else {
 			ipio_info("ioctl: set func mode = %x,%x,%x\n", szBuf[0],szBuf[1],szBuf[2]);
 			val = core_write(core_config->slave_i2c_addr, &szBuf[0], 3);
@@ -1632,8 +1654,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		} else {
 			ipio_info("ioctl: get fw version\n");
 			ret = copy_to_user((uint8_t *) arg, core_config->firmware_ver, protocol->fw_ver_len);
-			if (ret < 0) {
+			if (ret) {
 				ipio_err("Failed to copy firmware version to user space\n");
+				return -EFAULT;
 			}
 		}
 		break;
@@ -1647,8 +1670,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		} else {
 			ipio_info("ioctl: get protocl version\n");
 			ret = copy_to_user((uint8_t *) arg, core_config->protocol_ver, protocol->pro_ver_len);
-			if (ret < 0) {
+			if (ret) {
 				ipio_err("Failed to copy protocol version to user space\n");
+				return -EFAULT;
 			}
 		}
 		break;
@@ -1662,8 +1686,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		} else {
 			ipio_info("ioctl: get core version\n");
 			ret = copy_to_user((uint8_t *) arg, core_config->core_ver, protocol->core_ver_len);
-			if (ret < 0) {
+			if (ret) {
 				ipio_err("Failed to copy core version to user space\n");
+				return -EFAULT;
 			}
 		}
 		break;
@@ -1675,8 +1700,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		} else {
 			ipio_info("ioctl: get driver version\n");
 			ret = copy_to_user((uint8_t *) arg, szBuf, length);
-			if (ret < 0) {
+			if (ret) {
 				ipio_err("Failed to copy driver ver to user space\n");
+				return -EFAULT;
 			}
 		}
 		break;
@@ -1694,16 +1720,18 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 			id_to_user[2] = core_config->chip_ana_id;
 
 			ret = copy_to_user((uint32_t *) arg, id_to_user, sizeof(id_to_user));
-			if (ret < 0) {
+			if (ret) {
 				ipio_err("Failed to copy chip id to user space\n");
+				return -EFAULT;
 			}
 		}
 		break;
 
 	case ILITEK_IOCTL_TP_NETLINK_CTRL:
 		ret = copy_from_user(szBuf, (uint8_t *) arg, 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
+			return -EFAULT;
 		} else {
 			ipio_info("ioctl: netlink ctrl = %d\n", szBuf[0]);
 			if (szBuf[0]) {
@@ -1719,15 +1747,17 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 	case ILITEK_IOCTL_TP_NETLINK_STATUS:
 		ipio_info("ioctl: get netlink stat = %d\n", core_fr->isEnableNetlink);
 		ret = copy_to_user((int *)arg, &core_fr->isEnableNetlink, sizeof(int));
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy chip id to user space\n");
+			return -EFAULT;
 		}
 		break;
 
 	case ILITEK_IOCTL_TP_MODE_CTRL:
 		ret = copy_from_user(szBuf, (uint8_t *) arg, 4);
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
+			return -EFAULT;
 		} else {
 			ipio_info("ioctl: switch fw mode = %d\n", szBuf[0]);
 			mutex_lock(&ipd->touch_mutex);
@@ -1741,15 +1771,18 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 	case ILITEK_IOCTL_TP_MODE_STATUS:
 		ipio_info("ioctl: current firmware mode = %d", core_fr->actual_fw_mode);
 		ret = copy_to_user((int *)arg, &core_fr->actual_fw_mode, sizeof(int));
-		if (ret < 0)
+		if (ret) {
 			ipio_err("Failed to copy chip id to user space\n");
-
+			return -EFAULT;
+		}
 		break;
+
 	/* It works for host downloado only */
 	case ILITEK_IOCTL_ICE_MODE_SWITCH:
 		ret = copy_from_user(szBuf, (uint8_t *) arg, 1);
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
+			return -EFAULT;
 		} else {
 			ipio_info("ioctl: switch ice mode = %d", szBuf[0]);
 			if (szBuf[0])
@@ -1762,8 +1795,9 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 	case ILITEK_IOCTL_TP_INTERFACE_TYPE:
 		if_to_user = INTERFACE;
 		ret = copy_to_user((uint8_t *) arg, &if_to_user, sizeof(if_to_user));
-		if (ret < 0) {
+		if (ret) {
 			ipio_err("ioctl: Failed to copy interface type to user space\n");
+			return -EFAULT;
 		}
 		break;
 
