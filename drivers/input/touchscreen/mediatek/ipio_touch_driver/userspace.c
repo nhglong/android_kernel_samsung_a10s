@@ -552,11 +552,11 @@ static ssize_t ilitek_proc_debug_message_read(struct file *filp, char __user *bu
 		if (ret) {
 			ipio_err("copy_to_user err\n");
 			return -EFAULT;
-		} else {
-			*pPos += count;
-			ret = count;
-			ipio_debug(DEBUG_FINGER_REPORT, "Read %d bytes(s) from %ld\n", count, p);
 		}
+
+		*pPos += count;
+		ret = count;
+		ipio_debug(DEBUG_FINGER_REPORT, "Read %d bytes(s) from %ld\n", count, p);
 	}
 	/* ipio_err("send_data_len = %d\n", send_data_len); */
 	if (send_data_len <= 0 || send_data_len > 4096) {
@@ -1550,11 +1550,11 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
 			return -EFAULT;
-		} else {
-			ret = core_write(core_config->slave_i2c_addr, &szBuf[0], i2c_rw_length);
-			if (ret < 0)
-				ipio_err("Failed to write data via i2c\n");
 		}
+
+		ret = core_write(core_config->slave_i2c_addr, &szBuf[0], i2c_rw_length);
+		if (ret < 0)
+			ipio_err("Failed to write data via i2c\n");
 		break;
 
 	case ILITEK_IOCTL_I2C_READ_DATA:
@@ -1592,15 +1592,15 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
 			return -EFAULT;
+		}
+
+		ipio_info("ioctl: report switch = %d\n", szBuf[0]);
+		if (szBuf[0]) {
+			core_fr->isEnableFR = true;
+			ipio_debug(DEBUG_IOCTL, "Function of finger report was enabled\n");
 		} else {
-			ipio_info("ioctl: report switch = %d\n", szBuf[0]);
-			if (szBuf[0]) {
-				core_fr->isEnableFR = true;
-				ipio_debug(DEBUG_IOCTL, "Function of finger report was enabled\n");
-			} else {
-				core_fr->isEnableFR = false;
-				ipio_debug(DEBUG_IOCTL, "Function of finger report was disabled\n");
-			}
+			core_fr->isEnableFR = false;
+			ipio_debug(DEBUG_IOCTL, "Function of finger report was disabled\n");
 		}
 		break;
 
@@ -1610,13 +1610,12 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
 			return -EFAULT;
-		} else {
-			if (szBuf[0]) {
-				ilitek_platform_enable_irq();
-			} else {
-				ilitek_platform_disable_irq();
-			}
 		}
+
+		if (szBuf[0])
+			ilitek_platform_enable_irq();
+		else
+			ilitek_platform_disable_irq();
 		break;
 
 	case ILITEK_IOCTL_TP_DEBUG_LEVEL:
@@ -1624,10 +1623,10 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
 			return -EFAULT;
-		} else {
-			ipio_debug_level = katoi(dbg);
-			ipio_info("ipio_debug_level = %d", ipio_debug_level);
 		}
+
+		ipio_debug_level = katoi(dbg);
+		ipio_info("ipio_debug_level = %d", ipio_debug_level);
 		break;
 
 	case ILITEK_IOCTL_TP_FUNC_MODE:
@@ -1635,14 +1634,12 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
 			return -EFAULT;
-		} else {
-			ipio_info("ioctl: set func mode = %x,%x,%x\n", szBuf[0],szBuf[1],szBuf[2]);
-			val = core_write(core_config->slave_i2c_addr, &szBuf[0], 3);
-			if(val < 0){
-                             ipio_err("tp func mode write cmd failed.\n");
-			}
 		}
 
+		ipio_info("ioctl: set func mode = %x,%x,%x\n", szBuf[0],szBuf[1],szBuf[2]);
+		val = core_write(core_config->slave_i2c_addr, &szBuf[0], 3);
+		if (val < 0)
+			ipio_err("tp func mode write cmd failed.\n");
 		break;
 
 	case ILITEK_IOCTL_TP_FW_VER:
@@ -1732,15 +1729,15 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
 			return -EFAULT;
+		}
+
+		ipio_info("ioctl: netlink ctrl = %d\n", szBuf[0]);
+		if (szBuf[0]) {
+			core_fr->isEnableNetlink = true;
+			ipio_debug(DEBUG_IOCTL, "Netlink has been enabled\n");
 		} else {
-			ipio_info("ioctl: netlink ctrl = %d\n", szBuf[0]);
-			if (szBuf[0]) {
-				core_fr->isEnableNetlink = true;
-				ipio_debug(DEBUG_IOCTL, "Netlink has been enabled\n");
-			} else {
-				core_fr->isEnableNetlink = false;
-				ipio_debug(DEBUG_IOCTL, "Netlink has been disabled\n");
-			}
+			core_fr->isEnableNetlink = false;
+			ipio_debug(DEBUG_IOCTL, "Netlink has been disabled\n");
 		}
 		break;
 
@@ -1758,14 +1755,14 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
 			return -EFAULT;
-		} else {
-			ipio_info("ioctl: switch fw mode = %d\n", szBuf[0]);
-			mutex_lock(&ipd->touch_mutex);
-			ret = core_config_switch_fw_mode(szBuf);
-			mutex_unlock(&ipd->touch_mutex);
-			if (ret < 0)
-				ipio_err("ioctl: switch to fw mode (%d) failed\n", szBuf[0]);
 		}
+
+		ipio_info("ioctl: switch fw mode = %d\n", szBuf[0]);
+		mutex_lock(&ipd->touch_mutex);
+		ret = core_config_switch_fw_mode(szBuf);
+		mutex_unlock(&ipd->touch_mutex);
+		if (ret < 0)
+			ipio_err("ioctl: switch to fw mode (%d) failed\n", szBuf[0]);
 		break;
 
 	case ILITEK_IOCTL_TP_MODE_STATUS:
@@ -1783,13 +1780,13 @@ static long ilitek_proc_ioctl(struct file *filp, unsigned int cmd, unsigned long
 		if (ret) {
 			ipio_err("Failed to copy data from user space\n");
 			return -EFAULT;
-		} else {
-			ipio_info("ioctl: switch ice mode = %d", szBuf[0]);
-			if (szBuf[0])
-				core_config->icemodeenable = true;
-			else
-				core_config->icemodeenable = false;
 		}
+
+		ipio_info("ioctl: switch ice mode = %d", szBuf[0]);
+		if (szBuf[0])
+			core_config->icemodeenable = true;
+		else
+			core_config->icemodeenable = false;
 		break;
 
 	case ILITEK_IOCTL_TP_INTERFACE_TYPE:
