@@ -22,7 +22,6 @@ ifneq ($(CONFIG_MTK_GPU_SUPPORT),)
 	obj-y += ged/
 ifneq (, $(findstring $(CONFIG_MTK_PLATFORM), "mt6779"))
 	obj-y += gpu_bm/
-$(info *GPU defined GPU BM QoS 2.0)
 endif
 
 # GPU R5P0

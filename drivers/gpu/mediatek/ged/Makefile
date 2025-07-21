@@ -115,7 +115,6 @@ ccflags-y += \
 		 -I$(srctree)/drivers/misc/mediatek/cmdq/v2 \
 		 -I$(srctree)/drivers/misc/mediatek/cmdq/v2/$(subst ",,$(CONFIG_MTK_PLATFORM))
 else
-#$(info *CONFIG_MTK_PLATFORM 1 = $(word 1,$(CONFIG_MTK_PLATFORM)))
 ccflags-y += \
 		 -I$(srctree)/drivers/misc/mediatek/cmdq/v3
 
@@ -125,8 +124,6 @@ else
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/$(subst ",,$(CONFIG_MTK_PLATFORM))
 endif
 endif
-
-#$(info $$CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT is [${CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT}])
 
 #ccflags-$(CONFIG_MTK_TINYSYS_SSPM_SUPPORT) += -DGED_SSPM
 ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT),y)
@@ -141,8 +138,6 @@ ccflags-y += -DENABLE_COMMON_DVFS \
 else
 ccflags-y += -DGED_FDVFS_ENABLE
 endif
-else
-$(info $[GED]CONFIG_FPGA_EARLY_PORTING is [${CONFIG_FPGA_EARLY_PORTING}])
 endif
 
 ifeq ($(CONFIG_MTK_FTRACE_DEFAULT_ENABLE),y)

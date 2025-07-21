@@ -60,10 +60,6 @@ ifneq ($(KERNELRELEASE),)
             $(error $(ABS_PATH_TO_WLAN_DRV) is not existed)
         endif
 
-        $(warning symbolic link to $(PATH_TO_WMT_DRV))
-        $(warning symbolic link to $(PATH_TO_WLAN_CHR_DRV))
-        $(warning symbolic link to $(PATH_TO_WLAN_DRV))
-
         $(shell unlink $(srctree)/$(src)/wmt_drv)
         $(shell unlink $(srctree)/$(src)/wmt_chrdev_wifi)
         $(shell unlink $(srctree)/$(src)/wlan_drv_gen4m)
