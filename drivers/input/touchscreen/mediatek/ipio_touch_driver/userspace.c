@@ -440,13 +440,19 @@ static ssize_t ilitek_proc_debug_message_write(struct file *filp, const char *bu
 	int ret = 0;
 	unsigned char buffer[512] = { '\0' };//+modified by songbinbo.wt for ILITEK tp Coverity scan  CID77095 20190509
 
+	/* check if the buffer size is zero */
+	if (size == 0) {
+		ipio_err("input size is zero\n");
+		return -EINVAL;
+	}
+
 	/* check the buffer size whether it exceeds the local buffer size or not */
 	if (size > 512) {
 		ipio_err("buffer exceed 512 bytes\n");
 		size = 512;
 	}
 
-	ret = copy_from_user(buffer, buff, size - 1);
+	ret = copy_from_user(buffer, buff, size);
 	if (ret) {
 		ipio_err("copy data from user space, failed");
 		return -EFAULT;
@@ -1101,6 +1107,12 @@ static ssize_t ilitek_proc_check_battery_write(struct file *filp, const char *bu
 	int ret = 0;
 	char cmd[10] = { '\0' };//+modified by songbinbo.wt for ILITEK tp Coverity scan  CID77127 20190509
 
+	/* check if the buffer size is zero */
+	if (size == 0) {
+		ipio_err("input size is zero\n");
+		return -EINVAL;
+	}
+
 	if (size > sizeof(cmd)) {
 		ipio_err("Size is larger than the length of cmd\n");
 		goto out;
@@ -1112,7 +1124,7 @@ static ssize_t ilitek_proc_check_battery_write(struct file *filp, const char *bu
 	}
 
 	if (buff != NULL) {
-		ret = copy_from_user(cmd, buff, size - 1);
+		ret = copy_from_user(cmd, buff, size);
 		if (ret) {
 			ipio_info("copy data from user space, failed\n");
 			return -EFAULT;
@@ -1166,6 +1178,12 @@ static ssize_t ilitek_proc_check_esd_write(struct file *filp, const char *buff, 
 	int ret = 0;
 	char cmd[10] = { '\0' };	//+modified by songbinbo.wt for ILITEK tp Coverity scan  CID 77144 20190509
 
+	/* check if the buffer size is zero */
+	if (size == 0) {
+		ipio_err("input size is zero\n");
+		return -EINVAL;
+	}
+
 	if (size > sizeof(cmd)) {
 		ipio_err("Size is larger than the length of cmd\n");
 		goto out;
@@ -1177,7 +1195,7 @@ static ssize_t ilitek_proc_check_esd_write(struct file *filp, const char *buff, 
 	}
 
 	if (buff != NULL) {
-		ret = copy_from_user(cmd, buff, size - 1);
+		ret = copy_from_user(cmd, buff, size);
 		if (ret) {
 			ipio_info("copy data from user space, failed\n");
 			return -EFAULT;
