@@ -1034,11 +1034,11 @@ extern signed int battery_get_debug_uisoc(void);//bug 615299,xuejizhou.wt,ADD,20
 extern struct atomic_notifier_head charger_notifier;
 extern int register_mtk_battery_notifier(struct notifier_block *nb);
 extern void unre_mtk_battery_notifier(struct notifier_block *nb);
-extern int wt_set_batt_cycle_fv(void);
+extern int wt_set_batt_cycle_fv(struct mtk_battery *gm);
 #endif
 //-Bug 615302,xuejizhou.wt,ADD,20210113,battery Current event and slate mode
 #ifdef CONFIG_WT_PROJECT_S96717RA1
-extern int wt_set_batt_cycle_fv(void);
+extern int wt_set_batt_cycle_fv(struct mtk_battery *gm);
 #endif
 
 #endif /* __MTK_BATTERY_INTF_H__ */

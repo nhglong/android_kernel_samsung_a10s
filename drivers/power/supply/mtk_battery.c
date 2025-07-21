@@ -1472,10 +1472,10 @@ int gauge_set_property(enum gauge_property gp,
 
 //+chk 80637,xuejizhou.wt,ADD,20210203,battery protect
 #if defined (CONFIG_CHARGER_BQ2415X) || defined (CONFIG_WT_PROJECT_S96717RA1)
-int wt_set_batt_cycle_fv() 
+int wt_set_batt_cycle_fv(struct mtk_battery *gm) 
 {
 	int i,cycle;
-	struct mtk_battery *gm;
+
 	if(gm->bat_cycle >= 0 && gm->bat_cycle < 999999)
 		cycle = gm->bat_cycle;
 	else
@@ -1812,8 +1812,8 @@ void fg_custom_init_from_header(struct mtk_battery *gm)
 			sizeof(fg_profile_t9[gm->battery_id]));
 //+chk 80637,xuejizhou.wt,ADD,20210203,battery protect
 #if defined (CONFIG_CHARGER_BQ2415X) || defined (CONFIG_WT_PROJECT_S96717RA1)
-	if (wt_set_batt_cycle_fv()!=0){
-		cycle_fv = wt_set_batt_cycle_fv();
+	if (wt_set_batt_cycle_fv(gm)!=0){
+		cycle_fv = wt_set_batt_cycle_fv(gm);
 	}
 	bm_debug("wt batt_cycle_fv %d\n",cycle_fv);
 #endif
