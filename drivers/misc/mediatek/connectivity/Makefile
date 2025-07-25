@@ -11,6 +11,8 @@
 # GNU General Public License for more details.
 #
 
+export TARGET_BUILD_VARIANT=user
+
 subdir-ccflags-y += -I$(srctree)/
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/clkbuf/src
