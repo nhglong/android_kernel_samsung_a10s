@@ -396,6 +396,7 @@ static enum power_supply_property battery_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
+	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 	POWER_SUPPLY_PROP_BATT_MISC_EVENT,//Bug615305,xujizhou.wt,ADD,20210108,battery misc event
 	POWER_SUPPLY_PROP_BATT_CURRENT_UA_NOW,//Bug615306,xuejizhou.wt,ADD,20200104,battery Current Consumption
@@ -538,6 +539,32 @@ static int battery_psy_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
 		val->intval = check_cap_level(bs_data->bat_capacity);
+		break;
+	case POWER_SUPPLY_PROP_TIME_TO_FULL_NOW:
+		/* full or unknown must return 0 */
+		ret = check_cap_level(bs_data->bat_capacity);
+		if ((ret == POWER_SUPPLY_CAPACITY_LEVEL_FULL) ||
+			(ret == POWER_SUPPLY_CAPACITY_LEVEL_UNKNOWN))
+			val->intval = 0;
+		else {
+			int q_max_now = gm->fg_table_cust_data.fg_profile[
+						gm->battery_id].q_max;
+			int remain_ui = 100 - bs_data->bat_capacity;
+			int remain_mah = remain_ui * q_max_now / 10;
+			int current_now =
+			gauge_get_int_property(GAUGE_PROP_BATTERY_CURRENT);
+
+			int time_to_full = 0;
+
+			if (current_now != 0)
+				time_to_full = remain_mah * 3600 / current_now;
+
+				bm_debug("time_to_full:%d, remain:ui:%d mah:%d, current_now:%d, qmax:%d\n",
+					time_to_full, remain_ui, remain_mah,
+					current_now, q_max_now);
+			val->intval = abs(time_to_full);
+		}
+		ret = 0;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
 		if (check_cap_level(bs_data->bat_capacity) ==
